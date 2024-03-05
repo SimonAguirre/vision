@@ -87,13 +87,6 @@ class Thread(QThread):
                         detections = sv.Detections.from_ultralytics(results)
                         detections = self.tracker.update_with_detections(detections)
                         
-                        """
-                        # Reading frame in gray scale to process the pattern
-                        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-                        detections = cascade.detectMultiScale(gray_frame, scaleFactor=1.1,
-                                                   minNeighbors=5, minSize=(30, 30))
-                        """
                         annotated_frame = self.box_annotator.annotate(
                                 scene=frame.copy(),
                                 detections=detections
@@ -111,15 +104,6 @@ class Thread(QThread):
                                 labels = labels
                         )
                         
-                        """
-                        # Drawing green rectangle around the pattern
-                        for (x, y, w, h) in detections:
-                                pos_ori = (x, y)
-                                pos_end = (x + w, y + h)
-                                color = (0, 255, 0)
-                                cv2.rectangle(frame, pos_ori, pos_end, color, 2)
-                                
-                        """
                         # Reading the image in RGB to display it
                         color_frame = cv2.cvtColor(annotated_labeled_frame, cv2.COLOR_BGR2RGB)
                                 
