@@ -1,121 +1,36 @@
 # Python 3.12.2
 
-
-from tqdm import tqdm
-from ultralytics import YOLO
-
-import supervision as sv
-
 import os
 import sys
 import time
 
 import cv2
-from PySide6.QtCore import Qt, QThread, Signal, Slot
-from PySide6.QtGui import QAction, QImage, QKeySequence, QPixmap
-from PySide6.QtWidgets import (QApplication, QComboBox, QGroupBox,
+from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import (QApplication, QComboBox,
                                QHBoxLayout, QLabel, QMainWindow, QPushButton,
-                               QSizePolicy, QVBoxLayout, QWidget)
+                               QSizePolicy, QVBoxLayout, QWidget, QSlider,
+                               QTableWidget, QTableWidgetItem)
 
+#local imports
+from thread import Thread
 
-class Thread(QThread):
-        updateFrame = Signal(QImage)
-        tracker = sv.ByteTrack()
-        box_annotator = sv.BoundingBoxAnnotator()
-        label_annotator = sv.LabelAnnotator()
-        
-        def __init__(self, parent=None):
-                QThread.__init__(self, parent)
-                self.trained_file = None        # Weights
-                self.status = True              # Inference status
-                self.cap = True                 
-                self.confidence = 0.3
-                self.iou = 0.3
-                self.model = None
-
-                
-        def set_file(self, fname):
-                # The data comes with the 'opencv-python' module
-                self.trained_file = fname
-                print(f"getting model: {self.trained_file}")
-                self.model = YOLO(self.trained_file)
-                self.CLASS_NAMES_DICT = dict(self.model.model.names)
-                
-        def run(self):
-                self.cap = cv2.VideoCapture(0)
-                while self.status: 
-                        start_time = time.time()
-                        # cascade = cv2.CascadeClassifier(self.trained_file)
-                        ret, frame = self.cap.read()
-                        if not ret:
-                                continue
-                        
-                        results = self.model(
-                                frame,
-                                verbose=False,
-                                conf=self.confidence, 
-                                iou=self.iou
-                        )[0]
-                        detections = sv.Detections.from_ultralytics(results)
-                        detections = self.tracker.update_with_detections(detections)
-                        
-                        """
-                        # Reading frame in gray scale to process the pattern
-                        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-                        detections = cascade.detectMultiScale(gray_frame, scaleFactor=1.1,
-                                                   minNeighbors=5, minSize=(30, 30))
-                        """
-                        annotated_frame = self.box_annotator.annotate(
-                                scene=frame.copy(),
-                                detections=detections
-                        )
-                             
-                        labels = [
-                                f"#{tracker_id} {self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
-                                # f"{detect[4]}"
-                                for _, _, confidence, class_id, tracker_id, _
-                                # for detect
-                                in detections
-                        ]
-                        
-                        annotated_labeled_frame = self.label_annotator.annotate(
-                                scene=annotated_frame, 
-                                detections=detections,
-                                labels = labels
-                        )
-                        
-                        """
-                        # Drawing green rectangle around the pattern
-                        for (x, y, w, h) in detections:
-                                pos_ori = (x, y)
-                                pos_end = (x + w, y + h)
-                                color = (0, 255, 0)
-                                cv2.rectangle(frame, pos_ori, pos_end, color, 2)
-                                
-                        """
-                        # Reading the image in RGB to display it
-                        color_frame = cv2.cvtColor(annotated_labeled_frame, cv2.COLOR_BGR2RGB)
-                        
-                        
-                        # Creating and scaling QImage
-                        h, w, ch = color_frame.shape
-                        img = QImage(color_frame.data, w, h, ch * w, QImage.Format_RGB888)
-                        scaled_img = img.scaled(640, 480, Qt.KeepAspectRatio)
-                        
-                        
-                        # Emit signal
-                        self.updateFrame.emit(scaled_img)
-                        print(f"Inference: {(time.time()-start_time)*1000:.3f} ms | {(1/(time.time()-start_time)):.1f} fps")
-                sys.exit(-1)
 
 
 class Window(QMainWindow):
         def __init__(self):
                 super().__init__()
+                # Frontend flags and class variables
+                self.live_status = False
+                self.media_playback_status = False
+                self.confidence_threshold = 0.55
+                self.overlap_threshold = 0.55
+                self.media_source = None
+
                 # Title and dimensions
                 self.setWindowTitle("Vision Drive")
-                self.setGeometry(0, 0, 800, 500)
+                # self.setFixedSize(QSize(1280, 583))
+                self.setGeometry(0, 0, 1280, 600)
 
                 """
                 # Main menu bar
@@ -129,33 +44,103 @@ class Window(QMainWindow):
                         triggered=qApp.aboutQt)  # noqa: F821
                 self.menu_about.addAction(about)
                 """
-                
-                # Create a label for the display camera
-                self.label = QLabel(self)
-                self.label.setFixedSize(640, 480)
 
                 # Thread in charge of updating the image
-                self.th = Thread(self)
-                self.th.finished.connect(self.close)
+                self.th = Thread(self, verbose= False)
+                self.th.confidence = self.confidence_threshold
+                self.th.iou = self.overlap_threshold
+                # self.th.finished.connect(self.close)
                 self.th.updateFrame.connect(self.setImage)
 
+                """
                 # Model group
                 self.group_model = QGroupBox("Trained model")
                 self.group_model.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
                 model_layout = QHBoxLayout()
-
                 self.combobox = QComboBox()
-                self.combobox.addItem('yolov8s.pt')
-                self.combobox.addItem('yolov8m.pt')
-                # for xml_file in os.listdir(cv2.data.haarcascades):
-                #         if xml_file.endswith(".xml"):
-                #                 self.combobox.addItem(xml_file)
+                for model_file in os.listdir("./models"):
+                        self.combobox.addItem(model_file)
 
-                model_layout.addWidget(QLabel("File:"), 10)
+                model_layout.addWidget(QLabel("Trained Model:"), 10)
                 model_layout.addWidget(self.combobox, 90)
                 self.group_model.setLayout(model_layout)
+                """
+                # Create a label for the display
+                self.viewport = QLabel(self)
+                self.viewport.setMinimumSize(640, 480)
+                self.viewport.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                self.viewport.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-                # Buttons layout
+                # Model Container
+                model_container = QHBoxLayout()
+                self.model_combobox = QComboBox()
+                for model_file in os.listdir("./models"):
+                        self.model_combobox.addItem(model_file)
+                self.model_combobox.setFixedHeight(50)
+                model_container.addWidget(QLabel("Trained Model:"), 10)
+                model_container.addWidget(self.model_combobox, 90)
+                
+                # Veiw Port Layout
+                layout_6 = QVBoxLayout()
+                layout_6.addLayout(model_container)
+                layout_6.addWidget(self.viewport)
+
+                # Threshold Control
+                threshold_container = QVBoxLayout()
+
+                confidence_threshold_label = QHBoxLayout()
+                self.confidence_threshold_slider = QSlider(Qt.Orientation.Horizontal)
+                self.confidence_threshold_slider.setValue(round(self.confidence_threshold*100))
+                self.confidence_threshold_slider.setRange(0, 100)
+                self.confidence_threshold_slider.setMaximumWidth(300)
+                self.confidence_threshold_label_value = QLabel(f"{self.confidence_threshold:0.2f}")
+                self.confidence_threshold_slider.valueChanged.connect(self.confidence_slider_value_changed)
+                self.confidence_threshold_slider.sliderMoved.connect(self.confidence_slider_position)
+                self.confidence_threshold_slider.sliderPressed.connect(self.confidence_slider_pressed)
+                self.confidence_threshold_slider.sliderReleased.connect(self.confidence_slider_released)
+                confidence_threshold_label.addWidget(QLabel("Confidence"))
+                confidence_threshold_label.addWidget(self.confidence_threshold_label_value)
+
+                overlap_threshold_label = QHBoxLayout()
+                self.overlap_threshold_slider = QSlider(Qt.Orientation.Horizontal)
+                self.overlap_threshold_slider.setValue(round(self.overlap_threshold*100))
+                self.overlap_threshold_slider.setRange(0, 100)
+                self.overlap_threshold_slider.setMaximumWidth(300)
+                self.overlap_threshold_label_value = QLabel(f"{self.overlap_threshold:0.2f}")
+                self.overlap_threshold_slider.valueChanged.connect(self.overlap_slider_value_changed)
+                self.overlap_threshold_slider.sliderMoved.connect(self.overlap_slider_position)
+                self.overlap_threshold_slider.sliderPressed.connect(self.overlap_slider_pressed)
+                self.overlap_threshold_slider.sliderReleased.connect(self.overlap_slider_released)
+                overlap_threshold_label.addWidget(QLabel("Overlap"))
+                overlap_threshold_label.addWidget(self.overlap_threshold_label_value)
+                
+                threshold_container.addLayout(confidence_threshold_label)
+                threshold_container.addWidget(self.confidence_threshold_slider)
+                threshold_container.addLayout(overlap_threshold_label)
+                threshold_container.addWidget(self.overlap_threshold_slider)
+
+
+
+                # Control Panel Layout
+                layout_5 = QVBoxLayout()
+                self.media_load_button = QPushButton("Open Image or Video File")
+                self.live_button = QPushButton("Start Live")
+                self.export_button = QPushButton("Export Predictions")
+                self.media_load_button.setMaximumWidth(300)
+                self.live_button.setFixedHeight(50)
+                self.live_button.setMaximumWidth(300)
+                self.export_button.setFixedHeight(50)
+                self.export_button.setMaximumWidth(300)
+                self.media_load_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                self.live_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                self.export_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                layout_5.addWidget(self.media_load_button)
+                layout_5.addWidget(self.live_button)
+                layout_5.addLayout(threshold_container)
+                layout_5.addWidget(self.export_button)
+
+
+                """
                 buttons_layout = QHBoxLayout()
                 self.button1 = QPushButton("Start")
                 self.button2 = QPushButton("Stop/Close")
@@ -163,94 +148,171 @@ class Window(QMainWindow):
                 self.button2.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
                 buttons_layout.addWidget(self.button2)
                 buttons_layout.addWidget(self.button1)
+                """
 
+                """
                 right_layout = QHBoxLayout()
                 right_layout.addWidget(self.group_model, 1)
                 right_layout.addLayout(buttons_layout, 1)
+                """
 
-                # Main layout
-                layout = QVBoxLayout()
-                layout.addWidget(self.label)
-                layout.addLayout(right_layout)
+                # Inference Panel Layout
+                layout_4 = QHBoxLayout()
+                layout_4.addLayout(layout_5, 20)
+                layout_4.addLayout(layout_6)
+                
+                # App Title
+                app_title_label = QLabel("Vision Drive")
+                app_title_label.setFixedHeight(50)
+
+                # App How To
+                how_to_use_button = QPushButton("How to Use?")
+                how_to_use_button.setFixedHeight(50)
+
+                # App Header Layout
+                app_header_layout = QHBoxLayout()
+                app_header_layout.addWidget(app_title_label, 90)
+                app_header_layout.addWidget(how_to_use_button, 10)
+
+                # Vehicle Counter Tab
+                self.vehicle_counter_table = QTableWidget()
+                self.vehicle_counter_table.setRowCount(13)
+                self.vehicle_counter_table.setColumnCount(3)
+                self.vehicle_counter_table.setHorizontalHeaderLabels(["Vehicle Type", "Incoming", "Outgoing"])
+                self.vehicle_counter_table.setMaximumWidth(300)
+
+                # Results Layout
+                results_layout = QVBoxLayout()
+                results_layout.addWidget(QLabel("Traffic Data"))
+                results_layout.addWidget(QLabel("Vehicle Counter"))
+                results_layout.addWidget(self.vehicle_counter_table)
+                results_layout.addWidget(QLabel("Average Speed"))
+                # results_layout.addLayout(vehicle_speed_table)
+
+                # Sub Main Layout
+                sub_layout = QVBoxLayout()
+                sub_layout.addLayout(app_header_layout)
+                sub_layout.addLayout(layout_4)
+
+                # Main Layout
+                main_layout = QHBoxLayout()
+                main_layout.addLayout(sub_layout)
+                main_layout.addLayout(results_layout)
+
 
                 # Central widget
                 widget = QWidget(self)
-                widget.setLayout(layout)
+                widget.setLayout(main_layout)
                 self.setCentralWidget(widget)
 
                 # Connections
-                self.button1.clicked.connect(self.start)
-                self.button2.clicked.connect(self.kill_thread)
-                self.button2.setEnabled(False)
-                self.combobox.currentTextChanged.connect(self.set_model)
+                self.live_button.clicked.connect(self.live_start)
+                self.media_load_button.clicked.connect(self.media_start)
+                # self.button2.setEnabled(False)
+                self.model_combobox.currentTextChanged.connect(self.set_model)
 
+        def initialize_table(self):
+                for i, (class_id, class_name) in enumerate(self.th.CLASS_NAMES_DICT):
+                        item_name = QTableWidgetItem(class_name)
+                        item_code = QTableWidgetItem(class_name)
+                        item_color = QTableWidgetItem(class_id)
+                        self.vehicle_counter_table.setItem(i, 0, item_name)
+                        self.vehicle_counter_table.setItem(i, 1, item_code)
+                        self.vehicle_counter_table.setItem(i, 2, item_color)
         @Slot()
         def set_model(self, text):
                 self.th.set_file(text)
+                self.initialize_results()
 
-        @Slot()
         def kill_thread(self):
-                print("Finishing...")
-                self.button2.setEnabled(False)
-                self.button1.setEnabled(True)
+                print("Ending Inference...")
+                self.live_status = False
+                self.media_playback_status = False
                 self.th.cap.release()
                 cv2.destroyAllWindows()
-                self.status = False
+                self.th.status = False
                 self.th.terminate()
                 # Give time for the thread to finish
                 time.sleep(1)
 
-        @Slot()
-        def start(self):
-                print("Starting...")
-                self.button2.setEnabled(True)
-                self.button1.setEnabled(False)
-                self.th.set_file(self.combobox.currentText())
+        def start(self):           
+                self.th.status = True     
+                if type(self.media_source) == int:
+                        print("Starting from Live")
+                        self.live_status = True
+                else:
+                        print("Starting from File")
+                        self.media_playback_status = True
+                self.th.set_file(self.model_combobox.currentText())
+                self.th.set_media_source(self.media_source)
                 self.th.start()
 
         @Slot(QImage)
         def setImage(self, image):
-                self.label.setPixmap(QPixmap.fromImage(image))
+                self.viewport.setPixmap(QPixmap.fromImage(image))
 
+        @Slot()
+        def media_start(self):
+                self.media_source = './traffic_2.mp4'
+                if self.media_playback_status:
+                        self.media_load_button.setText("Start from a File")
+                        self.live_button.setEnabled(True)
+                        self.kill_thread()
+                else:
+                        self.media_load_button.setText("Stop Media Playback")
+                        self.live_button.setEnabled(False)
+                        self.start()
+        
+        @Slot()
+        def live_start(self):
+                self.media_source = 0
+                if self.live_status:
+                        self.live_button.setText("Start Live")
+                        self.media_load_button.setEnabled(True)
+                        self.kill_thread()
+                else:
+                        self.live_button.setText("End Live")
+                        self.media_load_button.setEnabled(False)
+                        self.start()
+        @Slot()
+        def confidence_slider_value_changed(self, value):
+                self.confidence_threshold = value/100
+                print(f"Confidence value: {self.confidence_threshold:0.2f}")
+
+        @Slot()
+        def confidence_slider_position(self, position):
+                print("Confidence slider position", position)
+
+        @Slot()
+        def confidence_slider_pressed(self):
+                print("Confidence slider pressed!")
+
+        @Slot()
+        def confidence_slider_released(self):
+                self.th.confidence = self.confidence_threshold
+                self.confidence_threshold_label_value.setText(f"{self.confidence_threshold:0.2f}")
+                print("Confidence updated")
+
+        @Slot()
+        def overlap_slider_value_changed(self, value):
+                self.overlap_threshold = value/100
+                print(f"Overlap value: {self.overlap_threshold:0.2f}")
+
+        @Slot()
+        def overlap_slider_position(self, position):
+                print("Overlap slider position", position)
+
+        @Slot()
+        def overlap_slider_pressed(self):
+                print("Overlap slider pressed!")
+
+        @Slot()
+        def overlap_slider_released(self):
+                self.th.iou = self.overlap_threshold
+                self.overlap_threshold_label_value.setText(f"{self.overlap_threshold:0.2f}")
+                print("Overlap updated")
 
 if __name__ == "__main__":
-        # SOURCE_WEIGHTS_PATH = 'yolov8s.pt'
-        # SOURCE_VIDEO_PATH = './video.mp4'
-        # TARGET_VIDEO_PATH = './video_out.mp4'
-        # CONFIDENCE_THRESHOLD = 0.3
-        # IOU_THRESHOLD = 0.3
-
-        # model = YOLO(SOURCE_WEIGHTS_PATH)
-
-        # tracker = sv.ByteTrack()
-        # box_annotator = sv.BoundingBoxAnnotator()
-        # label_annotator = sv.LabelAnnotator()
-        # frame_generator = sv.get_video_frames_generator(source_path=SOURCE_VIDEO_PATH)
-        # video_info = sv.VideoInfo.from_video_path(video_path=SOURCE_VIDEO_PATH)
-
-        # with sv.VideoSink(target_path=TARGET_VIDEO_PATH, video_info=video_info) as sink:
-        #         for frame in tqdm(frame_generator, total=video_info.total_frames):
-                        # results = model(
-                        #         frame,
-                        #         verbose=False,
-                        #         conf=CONFIDENCE_THRESHOLD, 
-                        #         iou=IOU_THRESHOLD
-                        # )[0]
-                        # detections = sv.Detections.from_ultralytics(results)
-                        # detections = tracker.update_with_detections(detections)
-
-                        # annotated_frame = box_annotator.annotate(
-                        #         scene=frame.copy(),
-                        #         detections=detections
-                        # )
-
-                        # annotated_labeled_frame = label_annotator.annotate(
-                        #         scene=annotated_frame, 
-                        #         detections=detections
-                        # )
-                        
-                        # sink.write_frame(frame=annotated_labeled_frame)
-
         app = QApplication()
         w = Window()
         w.show()
