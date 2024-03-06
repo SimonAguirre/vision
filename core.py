@@ -32,19 +32,6 @@ class Window(QMainWindow):
                 # self.setFixedSize(QSize(1280, 583))
                 self.setGeometry(0, 0, 1280, 600)
 
-                """
-                # Main menu bar
-                self.menu = self.menuBar()
-                self.menu_file = self.menu.addMenu("File")
-                exit = QAction("Exit", self, triggered=qApp.quit)  # noqa: F821
-                self.menu_file.addAction(exit)
-
-                self.menu_about = self.menu.addMenu("&About")
-                about = QAction("About Qt", self, shortcut=QKeySequence(QKeySequence.HelpContents),
-                        triggered=qApp.aboutQt)  # noqa: F821
-                self.menu_about.addAction(about)
-                """
-
                 # Thread in charge of updating the image
                 self.th = Thread(self, verbose= False)
                 self.th.confidence = self.confidence_threshold
@@ -52,19 +39,6 @@ class Window(QMainWindow):
                 # self.th.finished.connect(self.close)
                 self.th.updateFrame.connect(self.setImage)
 
-                """
-                # Model group
-                self.group_model = QGroupBox("Trained model")
-                self.group_model.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                model_layout = QHBoxLayout()
-                self.combobox = QComboBox()
-                for model_file in os.listdir("./models"):
-                        self.combobox.addItem(model_file)
-
-                model_layout.addWidget(QLabel("Trained Model:"), 10)
-                model_layout.addWidget(self.combobox, 90)
-                self.group_model.setLayout(model_layout)
-                """
                 # Create a label for the display
                 self.viewport = QLabel(self)
                 self.viewport.setMinimumSize(640, 480)
@@ -100,7 +74,6 @@ class Window(QMainWindow):
                 self.confidence_threshold_slider.sliderReleased.connect(self.confidence_slider_released)
                 confidence_threshold_label.addWidget(QLabel("Confidence"))
                 confidence_threshold_label.addWidget(self.confidence_threshold_label_value)
-
                 overlap_threshold_label = QHBoxLayout()
                 self.overlap_threshold_slider = QSlider(Qt.Orientation.Horizontal)
                 self.overlap_threshold_slider.setValue(round(self.overlap_threshold*100))
@@ -113,13 +86,10 @@ class Window(QMainWindow):
                 self.overlap_threshold_slider.sliderReleased.connect(self.overlap_slider_released)
                 overlap_threshold_label.addWidget(QLabel("Overlap"))
                 overlap_threshold_label.addWidget(self.overlap_threshold_label_value)
-                
                 threshold_container.addLayout(confidence_threshold_label)
                 threshold_container.addWidget(self.confidence_threshold_slider)
                 threshold_container.addLayout(overlap_threshold_label)
                 threshold_container.addWidget(self.overlap_threshold_slider)
-
-
 
                 # Control Panel Layout
                 layout_5 = QVBoxLayout()
@@ -138,23 +108,6 @@ class Window(QMainWindow):
                 layout_5.addWidget(self.live_button)
                 layout_5.addLayout(threshold_container)
                 layout_5.addWidget(self.export_button)
-
-
-                """
-                buttons_layout = QHBoxLayout()
-                self.button1 = QPushButton("Start")
-                self.button2 = QPushButton("Stop/Close")
-                self.button1.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                self.button2.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                buttons_layout.addWidget(self.button2)
-                buttons_layout.addWidget(self.button1)
-                """
-
-                """
-                right_layout = QHBoxLayout()
-                right_layout.addWidget(self.group_model, 1)
-                right_layout.addLayout(buttons_layout, 1)
-                """
 
                 # Inference Panel Layout
                 layout_4 = QHBoxLayout()
@@ -199,7 +152,6 @@ class Window(QMainWindow):
                 main_layout.addLayout(sub_layout)
                 main_layout.addLayout(results_layout)
 
-
                 # Central widget
                 widget = QWidget(self)
                 widget.setLayout(main_layout)
@@ -210,20 +162,19 @@ class Window(QMainWindow):
                 self.media_load_button.clicked.connect(self.media_start)
                 # self.button2.setEnabled(False)
                 self.model_combobox.currentTextChanged.connect(self.set_model)
-
+        
+        
         def initialize_table(self):
-                for i, (class_id, class_name) in enumerate(self.th.CLASS_NAMES_DICT):
-                        item_name = QTableWidgetItem(class_name)
-                        item_code = QTableWidgetItem(class_name)
-                        item_color = QTableWidgetItem(class_id)
+                for i, class_id in enumerate(self.th.CLASS_NAMES_DICT):
+                        print(class_id)
+                        item_name = QTableWidgetItem(self.th.CLASS_NAMES_DICT[class_id])
+                        item_code = QTableWidgetItem()
+                        item_color = QTableWidgetItem() 
                         self.vehicle_counter_table.setItem(i, 0, item_name)
                         self.vehicle_counter_table.setItem(i, 1, item_code)
                         self.vehicle_counter_table.setItem(i, 2, item_color)
-        @Slot()
-        def set_model(self, text):
-                self.th.set_file(text)
-                self.initialize_results()
-
+                self.vehicle_counter_table
+        
         def kill_thread(self):
                 print("Ending Inference...")
                 self.live_status = False
@@ -234,9 +185,9 @@ class Window(QMainWindow):
                 self.th.terminate()
                 # Give time for the thread to finish
                 time.sleep(1)
-
+        
         def start(self):           
-                self.th.status = True     
+                self.th.status = True
                 if type(self.media_source) == int:
                         print("Starting from Live")
                         self.live_status = True
@@ -246,6 +197,11 @@ class Window(QMainWindow):
                 self.th.set_file(self.model_combobox.currentText())
                 self.th.set_media_source(self.media_source)
                 self.th.start()
+                
+        @Slot()
+        def set_model(self, text):
+                self.th.set_file(text)
+                self.initialize_table()
 
         @Slot(QImage)
         def setImage(self, image):
@@ -253,7 +209,7 @@ class Window(QMainWindow):
 
         @Slot()
         def media_start(self):
-                self.media_source = './traffic_2.mp4'
+                self.media_source = './video.mp4'
                 if self.media_playback_status:
                         self.media_load_button.setText("Start from a File")
                         self.live_button.setEnabled(True)
