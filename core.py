@@ -7,14 +7,16 @@ import time
 import cv2
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (QApplication, QComboBox,
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QPushButton,
                                QSizePolicy, QVBoxLayout, QWidget, QSlider,
                                QTableWidget, QTableWidgetItem)
+from pathlib import Path
+import threading
 
 #local imports
 from thread import Thread
-
+from viewport import Viewport
 
 
 class Window(QMainWindow):
@@ -25,7 +27,7 @@ class Window(QMainWindow):
                 self.media_playback_status = False
                 self.confidence_threshold = 0.55
                 self.overlap_threshold = 0.55
-                self.media_source = None
+                self.media_source = os.getcwd()
 
                 # Title and dimensions
                 self.setWindowTitle("Vision Drive")
@@ -40,10 +42,8 @@ class Window(QMainWindow):
                 self.th.updateFrame.connect(self.setImage)
 
                 # Create a label for the display
-                self.viewport = QLabel(self)
-                self.viewport.setMinimumSize(640, 480)
-                self.viewport.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-                self.viewport.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.viewport = Viewport(self)
+                self.viewport.mousePressed.connect(self.viewport_clicked)
 
                 # Model Container
                 model_container = QHBoxLayout()
@@ -59,9 +59,11 @@ class Window(QMainWindow):
                 layout_6.addLayout(model_container)
                 layout_6.addWidget(self.viewport)
 
+                # Detection Zone Control
+                
+
                 # Threshold Control
                 threshold_container = QVBoxLayout()
-
                 confidence_threshold_label = QHBoxLayout()
                 self.confidence_threshold_slider = QSlider(Qt.Orientation.Horizontal)
                 self.confidence_threshold_slider.setValue(round(self.confidence_threshold*100))
@@ -93,17 +95,22 @@ class Window(QMainWindow):
 
                 # Control Panel Layout
                 layout_5 = QVBoxLayout()
+                self.set_detect_zone_button = QPushButton("Draw Detection Zone")
                 self.media_load_button = QPushButton("Open Image or Video File")
                 self.live_button = QPushButton("Start Live")
                 self.export_button = QPushButton("Export Predictions")
+                self.set_detect_zone_button.setFixedHeight(50)
+                self.set_detect_zone_button.setMaximumWidth(300)
                 self.media_load_button.setMaximumWidth(300)
                 self.live_button.setFixedHeight(50)
                 self.live_button.setMaximumWidth(300)
                 self.export_button.setFixedHeight(50)
                 self.export_button.setMaximumWidth(300)
+                self.set_detect_zone_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
                 self.media_load_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
                 self.live_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
                 self.export_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                layout_5.addWidget(self.set_detect_zone_button)
                 layout_5.addWidget(self.media_load_button)
                 layout_5.addWidget(self.live_button)
                 layout_5.addLayout(threshold_container)
@@ -162,8 +169,7 @@ class Window(QMainWindow):
                 self.media_load_button.clicked.connect(self.media_start)
                 # self.button2.setEnabled(False)
                 self.model_combobox.currentTextChanged.connect(self.set_model)
-        
-        
+
         def initialize_table(self):
                 for i, class_id in enumerate(self.th.CLASS_NAMES_DICT):
                         print(class_id)
@@ -173,31 +179,43 @@ class Window(QMainWindow):
                         self.vehicle_counter_table.setItem(i, 0, item_name)
                         self.vehicle_counter_table.setItem(i, 1, item_code)
                         self.vehicle_counter_table.setItem(i, 2, item_color)
-                self.vehicle_counter_table
         
         def kill_thread(self):
                 print("Ending Inference...")
-                self.live_status = False
-                self.media_playback_status = False
+                self.th.status = False
                 self.th.cap.release()
                 cv2.destroyAllWindows()
-                self.th.status = False
                 self.th.terminate()
                 # Give time for the thread to finish
                 time.sleep(1)
         
-        def start(self):           
+        def start(self):
                 self.th.status = True
                 if type(self.media_source) == int:
-                        print("Starting from Live")
-                        self.live_status = True
+                        print(f"Starting from Live: {self.media_source}")
                 else:
-                        print("Starting from File")
-                        self.media_playback_status = True
+                        print(f"Starting from File: {self.media_source}")
                 self.th.set_file(self.model_combobox.currentText())
                 self.th.set_media_source(self.media_source)
                 self.th.start()
-                
+                print(threading.active_count())
+
+        def open_file_dialog(self):
+                if type(self.media_source)==int:
+                        landing_dir = os.getcwd()
+                else:
+                        landing_dir = self.media_source[:self.media_source.rindex('\\')]
+                        
+
+                filename, ok = QFileDialog.getOpenFileName(self,"Select a File", landing_dir, "Videos (*.mp4 *.mov *.avi *.dav)")
+                if filename:
+                        path = Path(filename)
+                        self.media_source = str(path)
+        
+        @Slot(tuple)
+        def viewport_clicked(self, position):
+                print(position)
+
         @Slot()
         def set_model(self, text):
                 self.th.set_file(text)
@@ -206,17 +224,21 @@ class Window(QMainWindow):
         @Slot(QImage)
         def setImage(self, image):
                 self.viewport.setPixmap(QPixmap.fromImage(image))
-
+        
         @Slot()
         def media_start(self):
-                self.media_source = './video.mp4'
+                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch1_20240203055922_20240203200203.dav"
+                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch11_20240202115743_20240202235348.dav"
                 if self.media_playback_status:
                         self.media_load_button.setText("Start from a File")
                         self.live_button.setEnabled(True)
+                        self.media_playback_status = False
                         self.kill_thread()
                 else:
+                        self.open_file_dialog()
                         self.media_load_button.setText("Stop Media Playback")
                         self.live_button.setEnabled(False)
+                        self.media_playback_status = True
                         self.start()
         
         @Slot()
@@ -225,10 +247,12 @@ class Window(QMainWindow):
                 if self.live_status:
                         self.live_button.setText("Start Live")
                         self.media_load_button.setEnabled(True)
+                        self.live_status = False
                         self.kill_thread()
                 else:
                         self.live_button.setText("End Live")
                         self.media_load_button.setEnabled(False)
+                        self.live_status = True
                         self.start()
         @Slot()
         def confidence_slider_value_changed(self, value):

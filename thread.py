@@ -6,23 +6,36 @@ import supervision as sv
 import os
 import sys
 import time
+import math
+import numpy as np
 
 import cv2
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QImage
-
+from supervision.draw.color import Color, ColorPalette
 
 class Thread(QThread):
+        box_thickness = 2
+        text_scale = 1
+        text_thickness = 2
+        text_padding = 10
+        
         updateFrame = Signal(QImage)
         tracker = sv.ByteTrack()
-        box_annotator = sv.BoundingBoxAnnotator()
-        label_annotator = sv.LabelAnnotator()
+        box_annotator = sv.BoundingBoxAnnotator(
+                thickness=box_thickness
+        )
+        label_annotator = sv.LabelAnnotator(
+                text_scale = text_scale,
+                text_thickness = text_thickness,
+                text_padding = text_padding,
+        )
         verbose = False
         
         def __init__(self, parent=None, **kwargs):
                 QThread.__init__(self, parent)
-                self.trained_file = None        # Weights
-                self.status = True              # Inference status
+                self.trained_file = None
+                self.status = True
                 self.cap = True                 
                 self.confidence = ...
                 self.iou = ...
@@ -45,7 +58,7 @@ class Thread(QThread):
         def set_media_source(self, source):
                 self.media_source = source
         
-        def draw_fps(self, frame, start_time):
+        def draw_fps(self, frame, start_time) -> cv2.typing.MatLike:
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 
                 fps = 1/(time.time()-start_time)
@@ -63,11 +76,21 @@ class Thread(QThread):
                 else:
                         fps_color = (100, 255, 0)
 
-                return cv2.putText(frame, f"FPS: {fps:0.2f}", (10, 30), font, 1, fps_color, 2, cv2.LINE_AA)
+                return cv2.putText(frame, f"FPS: {fps:0.2f}", (self.text_padding, int(self.text_padding*3)), font, self.text_scale, fps_color, self.text_thickness, cv2.LINE_AA)
 
         def run(self):
                 self.cap = cv2.VideoCapture(self.media_source)
                 self.fps_list = []
+                frame_width = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                self.box_thickness = math.ceil(frame_width/500)
+                self.text_scale = math.ceil(self.box_thickness/3)
+                self.text_thickness = math.ceil(self.box_thickness/2)
+                self.text_padding = math.ceil(self.text_scale*10)
+                self.box_annotator.thickness = self.box_thickness
+                self.label_annotator.text_scale = self.text_scale
+                self.label_annotator.text_thickness = self.text_thickness
+                self.label_annotator.text_padding = self.text_padding
+                print(f"Updated: box_thickness {self.box_annotator.thickness}, text_scale {self.label_annotator.text_scale}, text_thickness {self.label_annotator.text_thickness}, text_padding {self.label_annotator.text_padding}")
                 while self.status: 
                         start_time = time.time()
                         # cascade = cv2.CascadeClassifier(self.trained_file)
@@ -76,7 +99,7 @@ class Thread(QThread):
                                 print("Video frames exhausted...")
                                 break
 
-                        frame=cv2.resize(frame,(1280,720))
+                        frame=cv2.resize(frame,(853,480))
 
                         results = self.model(
                                 frame,
@@ -113,7 +136,7 @@ class Thread(QThread):
                         # Creating and scaling QImage
                         h, w, ch = color_frame.shape
                         img = QImage(color_frame.data, w, h, ch * w, QImage.Format_RGB888)
-                        scaled_img = img.scaled(1280, 720, Qt.KeepAspectRatio)
+                        scaled_img = img.scaled(853, 480, Qt.KeepAspectRatio)
 
                         # Emit signal
                         self.updateFrame.emit(scaled_img)
