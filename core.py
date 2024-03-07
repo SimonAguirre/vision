@@ -35,7 +35,7 @@ class Window(QMainWindow):
                 self.setGeometry(0, 0, 1280, 600)
 
                 # Thread in charge of updating the image
-                self.th = Thread(self, verbose= False)
+                self.th = Thread(self, verbose= True)
                 self.th.confidence = self.confidence_threshold
                 self.th.iou = self.overlap_threshold
                 # self.th.finished.connect(self.close)
@@ -166,7 +166,7 @@ class Window(QMainWindow):
 
                 # Connections
                 self.live_button.clicked.connect(self.live_start)
-                self.media_load_button.clicked.connect(self.media_start)
+                self.media_load_button.clicked.connect(self.open_file_dialog)
                 # self.button2.setEnabled(False)
                 self.model_combobox.currentTextChanged.connect(self.set_model)
 
@@ -199,18 +199,41 @@ class Window(QMainWindow):
                 self.th.set_media_source(self.media_source)
                 self.th.start()
                 print(threading.active_count())
+        
+        def media_start(self):
+                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch1_20240203055922_20240203200203.dav"
+                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch11_20240202115743_20240202235348.dav"
+                if self.media_playback_status:
+                        self.media_load_button.setText("Start from a File")
+                        self.live_button.setEnabled(True)
+                        self.media_playback_status = False
+                        self.kill_thread()
+                else:
+                        self.media_load_button.setText("Stop Media Playback")
+                        self.live_button.setEnabled(False)
+                        self.media_playback_status = True
+                        self.start()
 
+        @Slot()
         def open_file_dialog(self):
                 if type(self.media_source)==int:
                         landing_dir = os.getcwd()
                 else:
                         landing_dir = self.media_source[:self.media_source.rindex('\\')]
-                        
+                
+                if self.media_playback_status:
+                        self.media_start()
+                else:
+                        filename, ok = QFileDialog.getOpenFileName(self,"Select a File", landing_dir, "Videos (*.mp4 *.mov *.avi *.dav)")
 
-                filename, ok = QFileDialog.getOpenFileName(self,"Select a File", landing_dir, "Videos (*.mp4 *.mov *.avi *.dav)")
-                if filename:
-                        path = Path(filename)
-                        self.media_source = str(path)
+                        if filename:
+                                path = Path(filename)
+                                self.media_source = str(path)
+
+                        if ok:
+                                self.media_start()
+                        else:
+                                print("File selection unsuccessful")
         
         @Slot(tuple)
         def viewport_clicked(self, position):
@@ -224,22 +247,6 @@ class Window(QMainWindow):
         @Slot(QImage)
         def setImage(self, image):
                 self.viewport.setPixmap(QPixmap.fromImage(image))
-        
-        @Slot()
-        def media_start(self):
-                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch1_20240203055922_20240203200203.dav"
-                # self.media_source = r"E:\Batangas CCTV - dataset\dvr_ch11_20240202115743_20240202235348.dav"
-                if self.media_playback_status:
-                        self.media_load_button.setText("Start from a File")
-                        self.live_button.setEnabled(True)
-                        self.media_playback_status = False
-                        self.kill_thread()
-                else:
-                        self.open_file_dialog()
-                        self.media_load_button.setText("Stop Media Playback")
-                        self.live_button.setEnabled(False)
-                        self.media_playback_status = True
-                        self.start()
         
         @Slot()
         def live_start(self):

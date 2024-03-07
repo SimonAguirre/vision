@@ -76,16 +76,17 @@ class Thread(QThread):
                 else:
                         fps_color = (100, 255, 0)
 
-                return cv2.putText(frame, f"FPS: {fps:0.2f}", (self.text_padding, int(self.text_padding*3)), font, self.text_scale, fps_color, self.text_thickness, cv2.LINE_AA)
+                return cv2.putText(frame, f"FPS: {fps:0.2f}", (10, 30), font, self.text_scale, fps_color, self.text_thickness, cv2.LINE_AA)
 
         def run(self):
+                frame_size = (853,480)
                 self.cap = cv2.VideoCapture(self.media_source)
                 self.fps_list = []
-                frame_width = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-                self.box_thickness = math.ceil(frame_width/500)
-                self.text_scale = math.ceil(self.box_thickness/3)
-                self.text_thickness = math.ceil(self.box_thickness/2)
-                self.text_padding = math.ceil(self.text_scale*10)
+                # frame_size = (round(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), round(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+                self.box_thickness = math.ceil(frame_size[0]/640)
+                self.text_scale = frame_size[0]/1280
+                self.text_thickness = math.ceil(frame_size[0]/640)
+                self.text_padding = math.ceil(frame_size[0]*5*self.text_scale/640)
                 self.box_annotator.thickness = self.box_thickness
                 self.label_annotator.text_scale = self.text_scale
                 self.label_annotator.text_thickness = self.text_thickness
@@ -95,11 +96,15 @@ class Thread(QThread):
                         start_time = time.time()
                         # cascade = cv2.CascadeClassifier(self.trained_file)
                         ret, frame = self.cap.read()
+                        
                         if not ret:
                                 print("Video frames exhausted...")
                                 break
 
-                        frame=cv2.resize(frame,(853,480))
+                        frame=cv2.resize(frame,frame_size)
+
+                        # Reading the image in RGB to display it
+                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                         results = self.model(
                                 frame,
@@ -107,39 +112,34 @@ class Thread(QThread):
                                 conf=self.confidence, 
                                 iou=self.iou
                         )[0]
+
                         detections = sv.Detections.from_ultralytics(results)
                         detections = self.tracker.update_with_detections(detections)
-                        
                         annotated_frame = self.box_annotator.annotate(
                                 scene=frame.copy(),
                                 detections=detections
                         )
-                             
                         labels = [
                                 f"#{tracker_id} {self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
                                 for _, _, confidence, class_id, tracker_id, _
                                 in detections
                         ]
-                        
                         annotated_labeled_frame = self.label_annotator.annotate(
                                 scene=annotated_frame, 
                                 detections=detections,
                                 labels = labels
                         )
-                        
-                        # Reading the image in RGB to display it
-                        color_frame = cv2.cvtColor(annotated_labeled_frame, cv2.COLOR_BGR2RGB)
                                 
                         # Get and draw FPS
-                        color_frame = self.draw_fps(color_frame, start_time)
+                        final_frame = self.draw_fps(annotated_labeled_frame.copy(), start_time)
 
                         # Creating and scaling QImage
-                        h, w, ch = color_frame.shape
-                        img = QImage(color_frame.data, w, h, ch * w, QImage.Format_RGB888)
-                        scaled_img = img.scaled(853, 480, Qt.KeepAspectRatio)
+                        h, w, ch = final_frame.shape
+                        img = QImage(final_frame.data, w, h, ch * w, QImage.Format_RGB888)
+                        # scaled_img = img.scaled(frame_size[0], frame_size[1], Qt.KeepAspectRatio)
 
                         # Emit signal
-                        self.updateFrame.emit(scaled_img)
+                        self.updateFrame.emit(img)
                         
                         if self.verbose:
                                 print(f"Inference: {(time.time()-start_time)*1000:0.3f} ms | {(1/(time.time()-start_time)):0.2f} fps")
