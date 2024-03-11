@@ -1,48 +1,47 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QWidget, QApplication
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QThread, QThreadPool, Slot, QTimer
 
+from data_queue import DataQueue
 from frame_grabber import FrameGrabber
-from data_queue import MessageQueue
-from object_detector import ObjectDetector
-from tracking_msg import TrackingMsg
-from object_tracker import ObjectTracker
-from frame_annotator import FrameWriter
-from data_queue import MessageQueue
 
+
+from frame_pooler import FramePooler
+from object_detector import ObjectDetector
+# from tracking_msg import TrackingMsg
+from object_tracker import Tracker
+from frame_annotator import Annotator
+
+import time
 import sys
 
 class GUI(QMainWindow):
-        def __init__(self, parent: QWidget | None = ..., flags: Qt.WindowType = ...) -> None:
-                super().__init__(parent, flags)
-                    # Create the message queues
-                    
-        input_queue = MessageQueue()
-        detection_queue = MessageQueue()
-        tracking_queue = MessageQueue()
-        output_queue = MessageQueue()
-
-        # Create the tasks
-        frame_grabber = FrameGrabber(input_queue)
-        object_detector = ObjectDetector(input_queue, detection_queue)
-        object_tracker = ObjectTracker(detection_queue, tracking_queue)
-        frame_writer = FrameWriter(tracking_queue, output_queue)
-
-        # Start the tasks
-        frame_grabber.start()
-        object_detector.start()
-        object_tracker.start()
-        frame_writer.start()
-
-        # Wait for all tasks to finish
-        frame_grabber.wait()
-        object_detector.wait()
-        object_tracker.wait()
-        frame_writer.wait()
-
-
-
-
+        def __init__(self, parent: QWidget | None = None) -> None:
+                super().__init__(parent)
+                
+                self.frame_q = DataQueue()
+                self.frame_q.setObjectName("Input Frames Queue")
+                
+                self.frame_grabber = FrameGrabber()
+                self.frame_grabber.setObjectName("Frame Grabber")
+                
+                self.frame_grabber_thread = QThread()
+                self.frame_grabber_thread.started.connect(self.frame_grabber.main_function)
+                self.frame_grabber.finished.connect(self.frame_grabber_thread.quit)
+                self.frame_grabber.main_output_stream.connect(self.frame_q.put)
+                self.frame_grabber.moveToThread(self.frame_grabber_thread)
+                # self.frame_grabber.main_output_stream.connect()
+                self.frame_grabber_thread.start()
+                
+                end_timer = QTimer(self)
+                end_timer.timeout.connect(self.exit_app)
+                end_timer.setSingleShot(True)
+                end_timer.start(10000)
+                
+        @Slot()
+        def exit_app(self):
+                self.thread().quit()
+                
 if __name__ == "__main__":
         app = QApplication()
         w = GUI()

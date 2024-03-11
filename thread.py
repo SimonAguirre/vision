@@ -53,7 +53,7 @@ class Thread(QThread):
                 self.trained_file = fname
                 print(f"getting model: {self.trained_file}")
                 self.model = YOLO(os.path.join("./models",self.trained_file))
-                self.CLASS_NAMES_DICT = dict(self.model.model.names)
+                self.CLASS_NAMES_DICT = dict(self.model.names)
         
         def set_media_source(self, source):
                 self.media_source = source
