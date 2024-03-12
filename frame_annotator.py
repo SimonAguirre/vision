@@ -3,7 +3,9 @@ from PySide6.QtCore import QObject, QThread
 from data_queue import DataQueue
 from supervision import Detections
 from cv2.typing import MatLike
+from testing import VERBOSE
 import time
+
 
 class Annotator(QThread):
         def __init__(self, in_queue: DataQueue, out_queue: DataQueue,
