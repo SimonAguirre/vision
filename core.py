@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import supervision
 
 import cv2
 from PySide6.QtCore import Qt, Slot
@@ -11,13 +12,57 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QPushButton,
                                QSizePolicy, QVBoxLayout, QWidget, QSlider,
                                QTableWidget, QTableWidgetItem)
+from supervision.geometry.core import Position
 from pathlib import Path
 import threading
+import numpy as np
 
 #local imports
 from thread import Thread
 from viewport import Viewport
 
+model_class_list = [
+        "auv",                  # suv
+        "bicycle",              # bicycle
+        "box-truck",            # box-truck
+        "bus",                  # bus
+        "coupe",                # car
+        "crossover",            # suv
+        "drop-side-truck",      # drop-side-truck
+        "dump-truck",           # dump-truck
+        "e-bike",               # e-bike
+        "e-trike",              # e-trike
+        "hatchback",            # car
+        "jeepney",              # jeepney
+        "minibus",              # minibus
+        "motorcycle",           # motorcycle
+        "mpv",                  # suv
+        "owner-type-jeep",      # owner-type-jeep
+        "pickup-truck",         # pickup-truck
+        "sedan",                # car
+        "suv",                  # suv
+        "tricycle",             # tricycle
+        "utility-van",          # van
+        "van",                  # van
+]
+
+counting_class_list = [
+        "bicycle",
+        "box-truck",
+        "bus",
+        "car",                  # sedan, hatchback, coupe
+        "drop-side-truck",
+        "dump-truck",
+        "e-bike",
+        "e-trike",
+        "jeepney",
+        "minibus",
+        "motorcycle",
+        "owner-type-jeep",
+        "pickup-truck",
+        "tricycle",
+        "van"
+]
 
 class Window(QMainWindow):
         def __init__(self):
@@ -29,13 +74,17 @@ class Window(QMainWindow):
                 self.overlap_threshold = 0.55
                 self.media_source = os.getcwd()
 
+                self.set_detection_zone_flag = False
+                self.detection_zone = [[0,0],[0,0],[0,0],[0,0]]
+                self.set_detection_zone_counter = 0
+
                 # Title and dimensions
                 self.setWindowTitle("Vision Drive")
                 # self.setFixedSize(QSize(1280, 583))
                 self.setGeometry(0, 0, 1280, 600)
 
                 # Thread in charge of updating the image
-                self.th = Thread(self, verbose= True)
+                self.th = Thread()
                 self.th.confidence = self.confidence_threshold
                 self.th.iou = self.overlap_threshold
                 # self.th.finished.connect(self.close)
@@ -106,10 +155,10 @@ class Window(QMainWindow):
                 self.live_button.setMaximumWidth(300)
                 self.export_button.setFixedHeight(50)
                 self.export_button.setMaximumWidth(300)
-                self.set_detect_zone_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                self.media_load_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                self.live_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-                self.export_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                self.set_detect_zone_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+                self.media_load_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+                self.live_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+                self.export_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
                 layout_5.addWidget(self.set_detect_zone_button)
                 layout_5.addWidget(self.media_load_button)
                 layout_5.addWidget(self.live_button)
@@ -167,6 +216,7 @@ class Window(QMainWindow):
                 # Connections
                 self.live_button.clicked.connect(self.live_start)
                 self.media_load_button.clicked.connect(self.open_file_dialog)
+                self.set_detect_zone_button.clicked.connect(self.assign_detection_zone)
                 # self.button2.setEnabled(False)
                 self.model_combobox.currentTextChanged.connect(self.set_model)
 
@@ -213,7 +263,7 @@ class Window(QMainWindow):
                         self.live_button.setEnabled(False)
                         self.media_playback_status = True
                         self.start()
-
+                
         @Slot()
         def open_file_dialog(self):
                 if type(self.media_source)==int:
@@ -234,10 +284,25 @@ class Window(QMainWindow):
                                 self.media_start()
                         else:
                                 print("File selection unsuccessful")
-        
+
+        @Slot()
+        def assign_detection_zone(self):
+                self.set_detection_zone_counter = 0
+                self.set_detection_zone_flag = True
+                self.set_detect_zone_button.setEnabled(False)
+
         @Slot(tuple)
-        def viewport_clicked(self, position):
-                print(position)
+        def viewport_clicked(self, position: tuple[float, float]):
+                if self.set_detection_zone_flag:
+                        self.detection_zone[self.set_detection_zone_counter] = [position[0],position[1]]
+                        print(self.detection_zone[self.set_detection_zone_counter])
+                        self.set_detection_zone_counter += 1
+                        if self.set_detection_zone_counter >= 4:
+                                self.set_detection_zone_flag = False
+                                self.set_detect_zone_button.setEnabled(True)
+                                print(f"New detection zone set: {self.detection_zone}")
+                                self.th.detection_zone = self.detection_zone
+                
 
         @Slot()
         def set_model(self, text):
