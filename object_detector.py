@@ -1,51 +1,49 @@
-from PySide6.QtCore import QObject, QThread
-from cv2 import Mat
+from PySide6.QtCore import QObject, Signal, Slot
 from ultralytics import YOLO
 from  ultralytics.engine.results import Results
 from supervision import Detections
-from data_queue import DataQueue
 from cv2.typing import MatLike
-from testing import VERBOSE
+
+from testing import print_
+from typing import Any
+Any = type(Any)
 
 class ObjectDetector(QObject):
-        def __init__(self, in_queue: DataQueue, out_queue: DataQueue,
-                model_file: str = './models/best.pt',
-                confidence_threshold: float = 0.5,
-                iou_threshold: float = 0.7,
-                parent: QObject | None = None) -> None:
-                
-                super().__init__(parent)
-                self.in_queue: DataQueue = in_queue
-                self.out_queue: DataQueue = out_queue
-                self.model = YOLO(model_file)
-                self.conf: float = confidence_threshold
-                self.iou: float = iou_threshold
-                print("Detector ready")
+        error = Signal(tuple)
+        fps = Signal(tuple)
+        put_data = Signal(tuple)
+        get_data = Signal(str) # request
+        finished = Signal() # connects to thread quit
 
-        def run(self):
-                count = 0
-                while True:
-                        count +=1
-                        frame: MatLike = self.in_queue.get()
+        def __init__(self):
+                super().__init__()
+                self.model: YOLO | None = None
+                self.iou: float | None = None
+                self.conf: float | None = None
+
+        def initilize_model(self, data):
+                self.model_file, self.iou, self.conf = data
+                self.model = YOLO(self.model_file)
+
+        def reload_worker(self, media_source: int | str, 
+                          iou: float, confidence: float):
+                pass
+
+        @Slot(Any)
+        def handle_recieved_data(self, data):
+                data, purpose = data
+                if purpose == 'initialize model':
+                        self.initilize_model(data)
+                else:
+                        frame = data
                         results: Results = self.model(frame,verbose=False,conf=self.conf,iou=self.iou)[0]
                         detections: Detections = Detections.from_ultralytics(results)
                         class_names: list[str] = self.model.names
-                        self.out_queue.put((frame, detections, class_names))
-                        print(f"Successfuly put item {count} to detections queue") if VERBOSE else ...
+                        self.put_data.emit((frame, detections, class_names))
 
-if __name__=="__main__":
-        from data_queue import DataQueue
-        from frame_grabber import FrameGrabber
 
-        iq = DataQueue()
-        oq = DataQueue()
+        @Slot()
+        def main_function(self):
+                
+                        self.get_data.emit("get raw frames")
 
-        fg = FrameGrabber(iq)
-        fg.start()
-
-        od = ObjectDetector(iq, out_queue=oq)
-        od.start()
-
-        print('....')
-        print(iq.get())
-        print(oq.get())

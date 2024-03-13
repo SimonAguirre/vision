@@ -1,8 +1,7 @@
 from asyncio.proactor_events import _ProactorBaseWritePipeTransport
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QWidget, QApplication
-from PySide6.QtCore import QThread, QThreadPool, Slot, QTimer
-
+from PySide6.QtCore import QThread, QThreadPool, Slot, QTimer, Signal
 from data_queue import DataQueue
 from frame_grabber import FrameGrabber
 
@@ -16,51 +15,95 @@ from frame_annotator import Annotator
 
 import time
 import sys
+Any = type(Any)
 
 class GUI(QMainWindow):
+        give_data_to_frame_grabber = Signal(Any)
+        give_data_to_detector = Signal(Any)
+        give_data_to_annotator = Signal(Any)
+
+        frame_grabber_thread = QThread()
+        object_detector_thread = QThread()
+        frame_annotator_thread = QThread()
+        frame_viewer_thread = QThread()
+
+        frame_grabber = FrameGrabber()
+        frame_q = DataQueue()
+        object_detector = ObjectDetector()
+        detection_q = DataQueue()
+        # annotator = Annotator()
+        # playback = FramePooler()
+
         def __init__(self, parent: QWidget | None = None) -> None:
                 super().__init__(parent)
-                
 
-                # Instantiate input queue of frames
-                self.frame_q = DataQueue()
-                self.frame_q.setObjectName("Input Frames Queue")
-                self.frame_grabber = FrameGrabber()
+                # Stage 1
+                self.media_source: int | str = 0
                 self.frame_grabber.setObjectName("Frame Grabber")
-                self.frame_grabber_thread = QThread()
-                self.frame_grabber_thread.started.connect(self.frame_grabber.main_function)
-                self.frame_grabber.finished.connect(self.frame_grabber_thread.quit)
-                self.frame_grabber.main_output_stream.connect(self.frame_q.put)
-                self.frame_grabber.fps.connect(self.fps_print)
+                self.frame_q.setObjectName("Input Frames Queue")
+
                 self.frame_grabber.moveToThread(self.frame_grabber_thread)
-                self.frame_grabber_thread.start()
+                self.frame_grabber_thread.started.connect(self.frame_grabber.main_function)
+                self.frame_grabber.stopped.connect(self.frame_grabber_thread.quit)
+                self.frame_grabber.write_queue.connect(self.frame_q.put)
                 
                 # Instantiate detection model and queue of detections
-                self.detection_q = DataQueue()
-                self.detection_q.setObjectName("Detections Queue")
-                self.object_detector = ObjectDetector()
+                self.model_file: str = './models/best_from_past_research.pt'
+                self.overlap_threshold: float = 0.54
+                self.confidence: float = 0.7
+
                 self.object_detector.setObjectName("Object Detector")
-                self.object_detector_thread = QThread()
-                self.object_detector_thread.started.connect(self.object_detector.main_function)
-                self.object_detector.finished.connect(self.object_detector_thread.quit)
-                self.object_detector.main_output_stream.connect(self.detection_q.put)
-                self.object_detector.fps.connect(self.fps_print)
+                self.detection_q.setObjectName("Detections Queue")
+
                 self.object_detector.moveToThread(self.object_detector_thread)
+                self.object_detector_thread.started.connect(self.object_detector.main_function)
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                self.object_detector.finished.connect(self.object_detector_thread.quit)
+                self.object_detector.put_data.connect(self.detection_q.put)
+                self.object_detector.get_data.connect(self.handle_data_request)
+                self.give_data_to_detector.connect(self.object_detector.handle_recieved_data)
+                self.object_detector.fps.connect(self.fps_print)
+                
                 self.object_detector_thread.start()
 
 
-                end_timer = QTimer(self)
-                end_timer.timeout.connect(self.exit_app)
-                end_timer.setSingleShot(True)
-                end_timer.start(10000)
+                self.end_timer = QTimer(self)
+                self.end_timer.timeout.connect(self.exit_app)
+                self.end_timer.setSingleShot(True)
                 
+                
+
+        @Slot(str)
+        def handle_data_request(self, request):
+                if request == 'dequeue':
+                        data = self.frame_q.get()
+                        self.give_data_to_frame_grabber.emit(data)
+                elif request == 'update detection model':
+                        data = zip([self.model_file,
+                                   self.overlap_threshold,
+                                   self.confidence])
+                        self.give_data_to_detector.emit(self.media_source)
+
+                elif request == 'get raw frames':
+                        data = self.frame_q.get()
+                        self.give_data_to_detector.emit(data)
+
+        def start_threads(self):
+                self.frame_grabber_thread.start()
+                self.object_detector_thread.start()
+                self.end_timer.start(10000)
+
         @Slot()
         def exit_app(self):
                 self.thread().quit()
-
-        @Slot(Any)
-        def fps_print(self, fps):
-                pass
                 
 if __name__ == "__main__":
         app = QApplication()

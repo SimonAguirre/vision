@@ -4,7 +4,6 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 import time
 import sys
 from data_queue import DataQueue
-
 from frame_grabber import FrameGrabber
 
 class Worker(QObject):
