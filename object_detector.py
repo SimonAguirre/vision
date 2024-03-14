@@ -2,7 +2,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from ultralytics import YOLO
 from  ultralytics.engine.results import Results
 from supervision import Detections
-
+import cv2
 from constants import Purpose
 from typing import Any
 Any = type(Any)
@@ -16,6 +16,7 @@ class ObjectDetector(QObject):
                 self.model: YOLO = YOLO("./models/best_from_past_research.pt")
                 self.iou: float = 0.55
                 self.conf: float = 0.7
+                self.model_detection_size = (853, 480)
                 self.is_inferencing: bool = False
 
         def _request_data(self):
@@ -25,16 +26,17 @@ class ObjectDetector(QObject):
                         return
                 sender = self.objectName()
                 self.read_from_queue.emit(sender)
-
+                
         def _detect(self, data):
                 """Run inference on the frame and emit the result to detections queue"""
                 frame = data
+                frame = cv2.resize(frame, self.model_detection_size)
                 results: Results = self.model(frame,verbose=False,conf=self.conf,iou=self.iou)[0]
                 detections: Detections = Detections.from_ultralytics(results)
                 class_names: list[str] = self.model.names
                 sender = self.objectName()
                 purpose = Purpose.RESTART_CYCLE
-                data = (frame, detections, class_names)
+                data = (data, detections, class_names)
                 self.write_to_queue.emit((sender, purpose, data))
                 self.score += 1
         

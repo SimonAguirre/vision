@@ -183,6 +183,3 @@ class Thread(QThread):
                         if verbose:
                                 print(f"Inference: {(time.time()-start_time)*1000:0.3f} ms | {(1/(time.time()-start_time)):0.2f} fps")
                 sys.exit(-1)
-
-        
-                

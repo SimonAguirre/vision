@@ -42,8 +42,7 @@ class Tracker(QObject):
         def _update_tracking_params(self, data):
                 """Update tracking parameters
                 params:
-                        - data: tuple of (tracking threshold, 
-                                          matching threshold)
+                        - data: tuple of (tracking threshold, matching threshold)
                 """
                 self.track_thresh, self.match_thresh, = data
                 self.tracker.track_thresh = self.track_thresh
