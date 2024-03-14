@@ -5,37 +5,46 @@ from numpy import ndarray
 import time
 
 from pyparsing import deque
-
+from constants import Purpose
 from testing import print_
 Any = type(Any)
 
 class FrameGrabber(QObject):
-        write_queue = Signal(tuple)
-        stopped = Signal() # connects to thread quit
+        write_to_queue = Signal(tuple)
 
         def __init__(self) -> None:
                 super().__init__()
                 self.media_source: int | str = 0
                 self.cap: VideoCapture = VideoCapture(self.media_source)
-        
-        @Slot(Any)
-        def update_config(self, config):
-                self.media_source = config
+
+        def _update_feed_params(self, data):
+                self.media_source = data
                 self.cap.release()
                 self.cap: VideoCapture = VideoCapture(self.media_source)
 
-        @Slot()
-        def main_function(self):
-                self.cap: VideoCapture = VideoCapture(self.media_source)
-                while not self.thread().isInterruptionRequested():
-                        # start = time.time()
-                        ok, frame = self.cap.read()
-                        if not ok:
-                                # self.error.emit(f"Frame Grabber failed to get more frames", {self.objectName()})
-                                print(f"Add error handling in {self.objectName()}")
-                                break
-                        frame = cvtColor(frame, COLOR_BGR2RGB)
-                        self.write_queue.emit((frame, self.objectName()))
+        def _grab_frames(self):
+                ok, frame = self.cap.read()
+                if not ok:
+                        # self.error.emit(f"Frame Grabber failed to get more frames", {self.objectName()})
+                        print(f"Add error handling in {self.objectName()}")
+                        return
+                frame = cvtColor(frame, COLOR_BGR2RGB)
+                sender = self.objectName()
+                purpose = Purpose.RESTART_CYCLE
+                self.write_to_queue.emit((sender, purpose, frame))
                         # self.fps.emit((1/(time.time()-start)))
-                self.cap.release()
-                print(f"{self.objectName()} stopped")
+        
+        @Slot(Any)
+        def handle_received_data(self, pack):
+                """Validate data received and call the appropriate function to process the data"""
+                try:
+                        target, purpose, data = pack
+                except:
+                        print(f"{self.objectName()} can't parse data passed to slot -> {pack}")
+                if not (target == self.objectName() or target == "all"):
+                        return
+                if purpose == Purpose.RESTART_CYCLE:
+                        if not self.thread().isInterruptionRequested():
+                                self._grab_frames()
+                elif purpose == Purpose.UPDATE_PARAMETERS:
+                        self._update_feed_params(data)

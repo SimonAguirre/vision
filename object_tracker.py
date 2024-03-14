@@ -1,52 +1,69 @@
-from PySide6.QtCore import QObject, QThread
+from PySide6.QtCore import QObject, Signal, Slot
 from supervision import ByteTrack
 from data_queue import DataQueue
 from supervision import Detections
 from cv2.typing import MatLike
 import cv2
+from constants import Purpose
 
-class Tracker(QThread):
-        def __init__(self, in_queue: DataQueue, out_queue: DataQueue, 
-                parent: QObject | None = None) -> None:
-                super().__init__(parent)
-                self.in_queue: DataQueue = in_queue
-                self.out_queue: DataQueue = out_queue
+class Tracker(QObject):
+        read_from_queue = Signal(str) # request
+        write_to_queue = Signal(tuple)
+        score = 0
+        def __init__(self):
+                super().__init__()
                 self.tracker = ByteTrack()
-                print("Tracker ready")
 
-        def run(self):
-                data = self.in_queue.get()
-                frame: MatLike = data[0]
-                detections: Detections = data[1]
-                class_names: list[str] = data[2]
-                del data
-                detections = self.tracker.update_with_detections(detections)
-                self.out_queue.put((frame, detections, class_names))
+        def _request_data(self):
+                """Request detections from queue"""
+                sender = self.objectName()
+                self.read_from_queue.emit(sender)
 
-if __name__=="__main__":
-        from data_queue import DataQueue
-        from frame_grabber import FrameGrabber
-        from object_detector import ObjectDetector
+        def _track(self, data):
+                """Run tracking on the detections and emit the result to tracking queue"""
+                frame, detections, class_names = data
+                new_detections = self.tracker.update_with_detections(detections)
+                sender = self.objectName()
+                purpose = Purpose.RESTART_CYCLE
+                data = (frame, new_detections, class_names)
+                self.write_to_queue.emit((sender, purpose, data))
+                self.score += 1
 
-        import time
+        def _initilize_tracker(self, data):
+                """Initialize tracker used for tracking"""
+                self.track_thresh, self.track_buffer, self.match_thresh, self.frame_rate = data
+                self.tracker = ByteTrack(
+                        self.track_thresh,
+                        self.track_buffer,
+                        self.match_thresh,
+                        self.frame_rate
+                )
 
-        iq = DataQueue()
-        detq = DataQueue()
-        traq = DataQueue()
+        def _update_tracking_params(self, data):
+                """Update tracking parameters
+                params:
+                        - data: tuple of (tracking threshold, 
+                                          matching threshold)
+                """
+                self.track_thresh, self.match_thresh, = data
+                self.tracker.track_thresh = self.track_thresh
+                self.tracker.match_thresh = self.match_thresh
 
-        fg = FrameGrabber(iq)
-        od = ObjectDetector(iq, detq)
-        ot = Tracker(detq,traq)
-
-        fg.start()
-        print(iq.empty())
-        # od.start()
-        print(detq.empty())
-        # ot.start()
-        print(traq.empty())
-        time.sleep(1)
-        print(iq.empty())
-
-        # print(iq.get())
-        # print(detq.get())
-        # print(traq.get())
+        @Slot(tuple)
+        def handle_received_data(self, pack):
+                """Validate data received and call the appropriate function to process the data"""
+                try:
+                        target, purpose, data = pack
+                except:
+                        print(f"{self.objectName()} can't parse data passed to slot -> {pack}")
+                if not (target == self.objectName() or target == "all"):
+                        return
+                if purpose == Purpose.CONTINUE_PROCESS:
+                        self._track(data)
+                elif purpose == Purpose.RESTART_CYCLE:
+                        if not self.thread().isInterruptionRequested():
+                                self._request_data()
+                elif purpose == Purpose.UPDATE_PARAMETERS:
+                        self._update_tracking_params(data)
+                elif purpose == Purpose.INITIALIZE:
+                        self._initilize_tracker(data)

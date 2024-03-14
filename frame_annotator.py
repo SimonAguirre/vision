@@ -5,22 +5,45 @@ from supervision import Detections
 from cv2.typing import MatLike
 from testing import VERBOSE
 import time
+from ast import Raise
+from PySide6.QtCore import QObject, Signal, Slot
+from supervision import Detections
+
+import time
+from constants import Purpose
+from typing import Any
+Any = type(Any)
 
 
 class Annotator(QThread):
-        def __init__(self, in_queue: DataQueue, out_queue: DataQueue,
-                thickness = 1, scale = 0.5,
-                parent: QObject | None = None) -> None:
-                super().__init__(parent)
+        read_from_queue = Signal(str) # request
+        write_to_queue = Signal(tuple)
+        score = 0
+        def __init__(self):
+                super().__init__()
                 self.box_annotator = BoundingBoxAnnotator()
                 self.label_annotator = LabelAnnotator()
-                self.in_queue: DataQueue = in_queue
-                self.out_queue: DataQueue = out_queue
+
+        def _request_data(self):
+                """Request frame from queue"""
+                sender = self.objectName()
+                self.read_from_queue.emit(sender)
+                thickness = 1
+                scale = 0.5
+
                 self.thickness: int = thickness
                 self.scale: float = scale
-                self.is_running: bool = True
-                print("Annotator ready")
-                
+        
+        def _initilize_annotators(self, data):
+                """Initialize annotators used for frame annotations"""
+        
+        def _update_annotation_params(self, data):
+                """Update annotation parameters
+                params:
+                        - data: tuple of (line_thickness, text_scale, )
+                """
+                self.iou, self.conf = data
+
         def run(self):
                 print(f"{self.objectName()} started")
                 while True:

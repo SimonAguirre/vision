@@ -3,6 +3,9 @@ import queue as q
 from PySide6.QtCore import QObject, QThread, Signal, Slot, QTimer
 from PySide6.QtWidgets import QApplication
 import time
+from typing import Any
+from data_queue import DataQueue
+Any = type(Any)
 
 class Worker(QObject):
     item_requested = Signal(str)  # Signal emitted to request an item from the main thread
@@ -22,10 +25,13 @@ class Worker(QObject):
 
     @Slot(str or None)
     def process_item(self, item):
+        target, item = item
+        if not target == self.objectName():
+            return
         if item == "None":
-              sender = self.objectName()
-        #       print("Queue empty!! retrying request")
-              self.item_requested.emit(sender)
+            sender = self.objectName()
+            # print("Queue empty!! retrying request")
+            self.item_requested.emit(sender)
         else:
                 self.processing = True
                 sender = self.objectName()
@@ -46,23 +52,17 @@ class Worker(QObject):
         return f"Item upgraded: {item}"
 
 class Controller(QObject):
-    give_item_w1 = Signal(str)
-    give_item_w2 = Signal(str)
+    write_to_q = Signal(Any)
+    # give_item_w1 = Signal(str)
+    # give_item_w2 = Signal(str)
     restart_cycle = Signal()
     restart_cycle_2 = Signal()
     def __init__(self):
         super().__init__()
-        self.queue = q.Queue()
-        self.counter = 4
-        self.on_q = 4
         self.last_frame_time = time.time()
         self.fps_trail = [0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,]
         # Example items to be processed
         items = ['item1', 'item2', 'item3', 'item4']
-
-        # Add items to the queue
-        for item in items:
-                self.queue.put(item)
 
         self.worker = Worker()
         self.worker_thread = QThread()
@@ -72,41 +72,54 @@ class Controller(QObject):
         self.worker_2.setObjectName("w2")
         self.worker_thread_2 = QThread()
 
+        self.queue = DataQueue()
+        self.queue.setObjectName("q1")
+        self.queue_thread = QThread()
+        
         # Move worker to the worker thread
         self.worker.moveToThread(self.worker_thread)
         self.worker_2.moveToThread(self.worker_thread_2)
+        self.queue.moveToThread(self.queue_thread)
 
         # Connect signals and slots
+
+        self.queue.data_output.connect(self.worker.process_item)
+        self.queue.data_output.connect(self.worker_2.process_item)
+        self.write_to_q.connect(self.queue.put)
+        
         self.worker_thread.started.connect(self.worker.request_item)
         self.restart_cycle.connect(self.worker.request_item)
-        self.worker.item_requested.connect(self.fetch_item_from_queue)
+        # self.worker.item_requested.connect(self.fetch_item_from_queue)
+        self.worker.item_requested.connect(self.queue.get)
         self.worker.item_processed.connect(self.process_item)
         self.worker_thread.finished.connect(self.worker_thread_ended)
-        self.give_item_w1.connect(self.worker.process_item)
+        # self.give_item_w1.connect(self.worker.process_item)
 
         self.worker_thread_2.started.connect(self.worker_2.request_item)
         self.restart_cycle_2.connect(self.worker_2.request_item)
-        self.worker_2.item_requested.connect(self.fetch_item_from_queue)
+        # self.worker_2.item_requested.connect(self.fetch_item_from_queue)
+        self.worker_2.item_requested.connect(self.queue.get)
         self.worker_2.item_processed.connect(self.process_item)
         self.worker_thread_2.finished.connect(self.worker_thread_ended)
-        self.give_item_w2.connect(self.worker_2.process_item)
+        # self.give_item_w2.connect(self.worker_2.process_item)
 
+        # Add items to the queue
+        for item in items:
+                self.write_to_q.emit(item)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.add_item_to_queue)
-        self.timer.start(10)
+        self.timer.start(33)
 
     @Slot()
     def add_item_to_queue(self):
-        self.counter += 1
-        self.on_q += 1
-        self.queue.put(f"item{self.counter}")
-        # print(f"Queued: {self.on_q} {self.fps}")
+        self.write_to_q.emit(f"item {time.time():0.1f}")
+        # print("tried to write to queue")
 
     @Slot()
     def worker_thread_ended(self):
          print(f"worker_thread_ended")
 
-    @Slot(zip)
+    @Slot(tuple)
     def process_item(self, item):
         # Handle processed item here
         item, sender = item
@@ -115,29 +128,27 @@ class Controller(QObject):
               self.fps_trail.append(1/(time.time()-self.last_frame_time))
         self.fps = sum(self.fps_trail)/10
         self.last_frame_time = time.time()
-
         print(f"{self.fps:0.2f}Received processed item: {item}, from {sender}")
-        self.on_q -= 1
         if sender == "w1":
              self.restart_cycle.emit()
         elif sender == 'w2':
              self.restart_cycle_2.emit()
 
-    @Slot(str)
-    def fetch_item_from_queue(self, sender):
-        # Emit signal to worker requesting an item from the queue
-        if not self.queue.empty():
-                # print("fetching")
-                item = self.queue.get()
-                if sender == 'w1':
-                        self.give_item_w1.emit(item)
-                elif sender == 'w2':
-                        self.give_item_w2.emit(item)
-        else:
-                if sender == 'w1':
-                        self.give_item_w1.emit("None")
-                elif sender == 'w2':
-                        self.give_item_w2.emit("None")
+    # @Slot(str)
+    # def fetch_item_from_queue(self, sender):
+    #     # Emit signal to worker requesting an item from the queue
+    #     if not self.queue.empty():
+    #             # print("fetching")
+    #             item = self.queue.get()
+    #             if sender == 'w1':
+    #                     self.give_item_w1.emit(item)
+    #             elif sender == 'w2':
+    #                     self.give_item_w2.emit(item)
+    #     else:
+    #             if sender == 'w1':
+    #                     self.give_item_w1.emit("None")
+    #             elif sender == 'w2':
+    #                     self.give_item_w2.emit("None")
 
 
 if __name__ == "__main__":
@@ -147,9 +158,9 @@ if __name__ == "__main__":
     controller = Controller()
 
     # Start the worker thread
+    controller.queue_thread.start()
     controller.worker_thread.start()
-    time.sleep(0.040)
+    # time.sleep(0.040)
     controller.worker_thread_2.start()
-    
 
     sys.exit(app.exec())
