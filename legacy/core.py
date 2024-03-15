@@ -19,7 +19,23 @@ import numpy as np
 
 #local imports
 from thread import Thread
-from viewport import Viewport
+
+from PySide6.QtGui import QMouseEvent
+from PySide6.QtWidgets import QLabel, QSizePolicy
+from PySide6.QtCore import Qt, Signal
+
+class Viewport(QLabel):
+        mousePressed = Signal(tuple)
+        def __init__(self, parent=None):
+                QLabel.__init__(self, parent)
+                self.setMinimumSize(640, 480)
+                self.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+                self.setScaledContents(True)
+                self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
+        def mousePressEvent(self, event: QMouseEvent) -> None:
+                active_point = (event.position().x()/self.size().width(), event.position().y()/self.size().height())
+                self.mousePressed.emit(active_point)
 
 model_class_list = [
         "auv",                  # suv
@@ -72,10 +88,11 @@ class Window(QMainWindow):
                 self.media_playback_status = False
                 self.confidence_threshold = 0.55
                 self.overlap_threshold = 0.55
-                self.media_source = os.getcwd()
+                self.media_source_path = os.getcwd()
+                self.media_source: str | int = 0
 
                 self.set_detection_zone_flag = False
-                self.detection_zone = [[0,0],[0,0],[0,0],[0,0]]
+                self.detection_zone = [[0.,0.],[0.,0.],[0.,0.],[0.,0.]]
                 self.set_detection_zone_counter = 0
 
                 # Title and dimensions
@@ -269,7 +286,7 @@ class Window(QMainWindow):
                 if type(self.media_source)==int:
                         landing_dir = os.getcwd()
                 else:
-                        landing_dir = self.media_source[:self.media_source.rindex('\\')]
+                        landing_dir = self.media_source_path
                 
                 if self.media_playback_status:
                         self.media_start()
@@ -278,7 +295,8 @@ class Window(QMainWindow):
 
                         if filename:
                                 path = Path(filename)
-                                self.media_source = str(path)
+                                self.media_source_path = str(path)[:str(path).rindex('\\')]
+                                self.media_source: str | int = str(path)
 
                         if ok:
                                 self.media_start()

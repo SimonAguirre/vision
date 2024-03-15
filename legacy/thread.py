@@ -14,7 +14,8 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QImage
 from supervision.draw.color import Color, ColorPalette
 from supervision.geometry.core import Position
-from testing import verbose
+
+verbose = False
 
 class Thread(QThread):
         box_thickness = 2
@@ -39,12 +40,12 @@ class Thread(QThread):
                 QThread.__init__(self)
                 self.trained_file = None
                 self.status = True
-                self.cap = True                 
+                self.media_source = 0
+                self.cap = cv2.VideoCapture(self.media_source)         
                 self.confidence = 0.55
                 self.iou = 0.55
-                self.model = None
-                self.media_source = 0
-                self.detection_zone = [[0,0],[0,0],[0,0],[0,0]]
+                self.model = YOLO("./models/best_from_past_research.pt")
+                self.detection_zone = [[0.,0.],[0.,0.],[0.,0.],[0.,0.]]
                 self.frame_size = (853,480)
                 self.display_size = (1920,1080)
                 self.COLORS = sv.ColorPalette.default()
@@ -61,7 +62,7 @@ class Thread(QThread):
                 self.trained_file = fname
                 print(f"getting model: {self.trained_file}")
                 self.model = YOLO(os.path.join("./models",self.trained_file))
-                self.CLASS_NAMES_DICT = dict(self.model.model.names)
+                self.CLASS_NAMES_DICT = dict(self.model.names)
         
         def set_media_source(self, source):
                 self.media_source = source
@@ -112,9 +113,8 @@ class Thread(QThread):
                                 break
 
                         frame_orig = frame.copy()
-
+                        frame_orig = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         frame_orig = cv2.resize(frame_orig, self.display_size)
-
 
                         frame = cv2.resize(frame,self.frame_size)
                         # Reading the image in RGB to display it
@@ -174,7 +174,7 @@ class Thread(QThread):
 
                         # Creating and scaling QImage
                         h, w, ch = final_frame.shape
-                        img = QImage(final_frame.data, w, h, ch * w, QImage.Format_RGB888)
+                        img = QImage(final_frame.data, w, h, ch * w, QImage.Format.Format_RGB888)
                         # scaled_img = img.scaled(self.frame_size[0], self.frame_size[1], Qt.KeepAspectRatio)
 
                         # Emit signal

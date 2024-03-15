@@ -2,8 +2,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from ultralytics import YOLO
 from  ultralytics.engine.results import Results
 from supervision import Detections
-import cv2
-from constants import Purpose
+from pipeline.constants import Purpose
 from typing import Any
 Any = type(Any)
 from collections import defaultdict

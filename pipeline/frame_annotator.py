@@ -8,15 +8,12 @@ from supervision import (Detections, PolygonZone, ColorPalette,
                          calculate_dynamic_text_scale)
 from supervision.draw.color import Color, ColorPalette
 from supervision.geometry.core import Position
-from  ultralytics.engine.results import Results
-from cv2.typing import MatLike
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtGui import QImage
 from supervision import Detections
 import numpy as np
-from constants import Purpose
+from pipeline.constants import Purpose
 from typing import Any
-import math
 Any = type(Any)
 
 
@@ -95,7 +92,6 @@ class Annotator(QObject):
                 image = QImage(annotated_frame.data, w, h, ch * w, QImage.Format.Format_RGB888)
                 sender = self.objectName()
                 purpose = Purpose.RESTART_CYCLE
-                print(QImage)
                 self.write_to_queue.emit((sender, purpose, image))
                 self.score += 1
         

@@ -1,13 +1,7 @@
 import queue
-from numpy import ndarray
-from supervision import Detections
-from cv2.typing import MatLike
-from PySide6.QtGui import QImage
 from PySide6.QtCore import QObject, Signal, Slot
-from testing import print_
-import time
 from typing import Any
-from constants import Purpose
+from pipeline.constants import Purpose
 Any = type(Any)
 
 

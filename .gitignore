@@ -2,3 +2,5 @@
 /support
 /videos
 /models
+/legacy/models
+/legacy/__pycache__
