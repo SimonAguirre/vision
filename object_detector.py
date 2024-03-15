@@ -6,18 +6,21 @@ import cv2
 from constants import Purpose
 from typing import Any
 Any = type(Any)
+from collections import defaultdict
 
 class ObjectDetector(QObject):
         read_from_queue = Signal(str) # request
         write_to_queue = Signal(tuple)
+        status_update = Signal(tuple)
+        fps = 0
         score = 0
         def __init__(self):
                 super().__init__()
                 self.model: YOLO = YOLO("./models/best_from_past_research.pt")
                 self.iou: float = 0.55
                 self.conf: float = 0.7
-                self.model_detection_size = (853, 480)
                 self.is_inferencing: bool = False
+                self.track_history = defaultdict(lambda: [])
 
         def _request_data(self):
                 """Request frame from queue"""
@@ -30,13 +33,13 @@ class ObjectDetector(QObject):
         def _detect(self, data):
                 """Run inference on the frame and emit the result to detections queue"""
                 frame = data
-                frame = cv2.resize(frame, self.model_detection_size)
-                results: Results = self.model(frame,verbose=False,conf=self.conf,iou=self.iou)[0]
+                results: Results = self.model.track(frame,conf=self.conf,iou=self.iou, verbose=False, persist=True)[0]
                 detections: Detections = Detections.from_ultralytics(results)
-                class_names: list[str] = self.model.names
+                class_names: dict = results.names
+
                 sender = self.objectName()
                 purpose = Purpose.RESTART_CYCLE
-                data = (data, detections, class_names)
+                data = (frame, detections, class_names)
                 self.write_to_queue.emit((sender, purpose, data))
                 self.score += 1
         
@@ -55,10 +58,7 @@ class ObjectDetector(QObject):
         @Slot(tuple)
         def handle_received_data(self, pack):
                 """Validate data received and call the appropriate function to process the data"""
-                try:
-                        target, purpose, data = pack
-                except:
-                        print(f"{self.objectName()} can't parse data passed to slot -> {pack}")
+                target, purpose, data = pack
                 if not (target == self.objectName() or target == "all"):
                         return
                 if purpose == Purpose.CONTINUE_PROCESS:
@@ -70,3 +70,7 @@ class ObjectDetector(QObject):
                         self._update_detection_params(data)
                 elif purpose == Purpose.INITIALIZE:
                         self._initilize_model(data)
+                        
+        @Slot()
+        def status_request_handler(self):
+                self.status_update.emit((self.objectName(), Purpose.STATUS_UPDATE, {"fps" : self.fps, "score" : self.score}))

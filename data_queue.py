@@ -13,9 +13,10 @@ Any = type(Any)
 
 class DataQueue(QObject):
         give_data_to_worker = Signal(tuple)
+        status_update = Signal(tuple)
         counter = 0
         on_q = 0
-        status_update = Signal(Any)
+        
 
         def __init__(self, parent = None):
                 super().__init__(parent=parent)
@@ -45,11 +46,7 @@ class DataQueue(QObject):
                 parameters:
                         - data: Any -> the item to be added to the queue
                 """
-                try:
-                        sender, purpose, data = pack
-                except:
-                        print(f"{self.objectName()} failed to understand data to be written on queue -> {pack}")
-                
+                sender, purpose, data = pack
                 item = data
                 self.queue.put(item, block=False)
                 self.on_q += 1
@@ -59,5 +56,4 @@ class DataQueue(QObject):
 
         @Slot()
         def status_request_handler(self):
-                self.status_update.emit((self.objectName(), Purpose.STATUS_UPDATE, (self.on_q, self.counter)))
-                # print(f"({self.objectName()}, {Purpose.STATUS_UPDATE}, ({self.on_q}, {self.counter}))")
+                self.status_update.emit((self.objectName(), Purpose.STATUS_UPDATE, {"on_queue" : self.on_q, "total" : self.counter}))
