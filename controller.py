@@ -93,6 +93,7 @@ class Controller(QObject):
                 # Stage 5 connections
                 self.frame_annotator.write_to_queue.connect(self.show_q.put)
                 self.show_q.give_data_to_worker.connect(self.frame_annotator.handle_received_data)
+                
 
                 # Controller connections
                 self.status_request.connect(self.frame_q.status_request_handler)

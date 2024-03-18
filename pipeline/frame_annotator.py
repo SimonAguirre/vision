@@ -3,9 +3,9 @@ from numpy import ndarray
 from PySide6.QtCore import QObject
 
 from supervision import (Detections, PolygonZone, ColorPalette,
-                         BoxCornerAnnotator, LabelAnnotator, TraceAnnotator,
-                         draw_polygon, calculate_dynamic_line_thickness,
-                         calculate_dynamic_text_scale)
+                        BoxCornerAnnotator, LabelAnnotator, TraceAnnotator,
+                        draw_polygon, calculate_dynamic_line_thickness,
+                        calculate_dynamic_text_scale)
 from supervision.draw.color import Color, ColorPalette
 from supervision.geometry.core import Position
 from PySide6.QtCore import QObject, Signal, Slot
@@ -33,12 +33,12 @@ class Annotator(QObject):
                 self.box_annotator = BoxCornerAnnotator(thickness=self.line_thickness,
                                                         corner_length=round(self.line_thickness*4))
                 self.label_annotator = LabelAnnotator(text_scale=self.text_scale,
-                                                      text_thickness=self.line_thickness,
-                                                      text_position=Position.BOTTOM_CENTER,)
+                                                        text_thickness=self.line_thickness,
+                                                        text_position=Position.BOTTOM_CENTER,)
                 self.trace_annotator = TraceAnnotator(thickness=self.line_thickness,
-                                                #       trace_length=video_info.fps * 2,
-                                                      trace_length=20,
-                                                      position=Position.BOTTOM_CENTER)
+                                                        # trace_length=video_info.fps * 2,
+                                                        trace_length=20,
+                                                        position=Position.BOTTOM_CENTER)
                 
                 self.zone_polygons = [[[0.0077, 0.975],[0.2446, 0.5229],[0.4738, 0.5104],[0.4892, 0.9646]],
                                                                 [[0.5031, 0.4958],[0.7338, 0.4917],[0.9954, 0.9917],[0.4969, 0.9604]]]
