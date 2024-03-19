@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFileSystem
                                QSizePolicy, QVBoxLayout, QWidget, QSlider, QStackedWidget,
                                QTableWidget, QTableWidgetItem)
 from PySide6.QtSvgWidgets import QSvgWidget
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 
 from gui.header import Header
 
@@ -44,9 +44,8 @@ class Button(QPushButton): # for sidebar use only
                         main_layout.setContentsMargins(0, 0, 0, 0)
                         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignCenter)
                         self.setLayout(main_layout)
-                        item = QLabel(text = icon)
-                        item.setStyleSheet("color: rgb(255, 255, 255); font-size: 22px; padding: 0px; border: 0px solid;")
-                        main_layout.addWidget(item)
+                        self.setIcon(icon)
+                        # main_layout.addWidget(item)
 
 class SideBar(QFrame):
         def __init__(self) -> None:
@@ -59,8 +58,8 @@ class SideBar(QFrame):
                 self.setLayout(self.main_layout)
                 self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        def add_sidebar_button(self, text, slot):
-                button = Button(text)
+        def add_sidebar_button(self, slot, icon):
+                button = Button(icon)
                 button.clicked.connect(slot)
                 self.main_layout.addWidget(button)
                 # button.setStyleSheet("""
@@ -115,9 +114,9 @@ class LiveMode(QWidget):
 
                 # sidebar
                 self.sidebar = SideBar()
-                self.sidebar.add_sidebar_button("E", self.show_file_explorer_panel)
-                self.sidebar.add_sidebar_button("D", self.show_detections_panel)
-                self.sidebar.add_sidebar_button("L", self.show_layers)
+                self.sidebar.add_sidebar_button(self.show_file_explorer_panel, QIcon("gui_res/explorer.png"))
+                self.sidebar.add_sidebar_button(self.show_detections_panel, QIcon("gui_res/detections.png"))
+                self.sidebar.add_sidebar_button(self.show_layers, QIcon("gui_res/tuning.png"))
 
                 # viewport
                 self.viewport = Viewport()
@@ -195,10 +194,6 @@ class GUI(object):
 
         def retranslateUI(self, MainWindow: QMainWindow):
                 MainWindow.setWindowTitle(QApplication.translate("MainWindow", "Vision Drive", None))
-                
-                self.header.minimize_button.setText(QApplication.translate("MainWindow", "-", None))
-                self.header.maximize_button.setText(QApplication.translate("MainWindow", "+", None))
-                self.header.close_button.setText(QApplication.translate("MainWindow", "x", None))
 
                 self.header.live_button.setText(QApplication.translate("MainWindow", "LIVE", None))
                 self.header.playback_button.setText(QApplication.translate("MainWindow", "PLAYBACK", None))
