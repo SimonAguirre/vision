@@ -17,5 +17,5 @@ if __name__ == "__main__":
         controller.start_threads() # make this a slot and have a signal from view to activate this
         view = MainWindow()
         view.show()
-        app.setWindowIcon(QIcon("./gui_res/logo_icon.svg"))
+        app.setWindowIcon(QIcon("./gui_res/logo_1.png"))
         sys.exit(app.exec())
