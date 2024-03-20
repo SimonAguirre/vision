@@ -5,15 +5,17 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFileSystem
                                QTableWidget, QTableWidgetItem)
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtGui import QFont, QIcon
+from ultralytics import Explorer
 
 from gui.header import Header
-
+from gui.sidepanel import SidePanel
 
 class Viewport(QFrame):
         def __init__(self):
                 super().__init__()
                 self.setStyleSheet(u"QFrame{background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,stop: 0 #848484, stop: 0.5 #314932, stop: 1 #0f0f0f); margin: 13 13 13 13;}")
-                self.logo = QSvgWidget("gui_res/logo_icon.svg")
+                self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
+                self.logo = QSvgWidget("src/logo_icon.svg")
                 self.logo.setFixedSize(46, 59)
                 self.logo.setStyleSheet("background-color: transparent")
                 self.main_layout = QVBoxLayout()
@@ -33,35 +35,35 @@ class Viewport(QFrame):
         #         active_point = (event.position().x()/self.size().width(), event.position().y()/self.size().height())
         #         self.mousePressed.emit(active_point)
 
-class Button(QPushButton): # for sidebar use only
-                def __init__(self, icon) -> None:
-                        super().__init__()
-                        # self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-                        # self.setStyleSheet("color: rgb(255, 255, 255); font-size: 24px; padding: 0 24px; border: 0px solid;")
-                        self.setFixedSize(45, 45)
-                        main_layout = QVBoxLayout()
-                        main_layout.setSpacing(0)
-                        main_layout.setContentsMargins(0, 0, 0, 0)
-                        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignCenter)
-                        self.setLayout(main_layout)
-                        self.setIcon(icon)
-                        # main_layout.addWidget(item)
+# class SideBarButton(QPushButton): # for sidebar use only
+#                 def __init__(self, icon) -> None:
+#                         super().__init__()
+#                         # self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+#                         # self.setStyleSheet("color: rgb(255, 255, 255); font-size: 24px; padding: 0 24px; border: 0px solid;")
+#                         self.setFixedSize(45, 45)
+#                         main_layout = QVBoxLayout()
+#                         main_layout.setSpacing(0)
+#                         main_layout.setContentsMargins(0, 0, 0, 0)
+#                         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignCenter)
+#                         self.setLayout(main_layout)
+#                         self.setIcon(icon)
+#                         # main_layout.addWidget(item)
 
-class SideBar(QFrame):
-        def __init__(self) -> None:
-                super().__init__()
-                self.main_layout = QVBoxLayout()
-                self.main_layout.setSpacing(0)
-                self.main_layout.setContentsMargins(0,0,0,0)
-                self.setStyleSheet("background-color: #393939;")  # Set sidebar background color
-                self.setFixedWidth(45)  # Set sidebar width
-                self.setLayout(self.main_layout)
-                self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+# class SideBar(QFrame):
+#         def __init__(self) -> None:
+#                 super().__init__()
+#                 self.main_layout = QVBoxLayout()
+#                 self.main_layout.setSpacing(0)
+#                 self.main_layout.setContentsMargins(0,0,0,0)
+#                 self.setStyleSheet("background-color: #393939;")  # Set sidebar background color
+#                 self.setFixedWidth(45)  # Set sidebar width
+#                 self.setLayout(self.main_layout)
+#                 self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        def add_sidebar_button(self, slot, icon):
-                button = Button(icon)
-                button.clicked.connect(slot)
-                self.main_layout.addWidget(button)
+#         def add_sidebar_button(self, slot, icon):
+#                 button = SideBarButton(icon)
+#                 button.clicked.connect(slot)
+#                 self.main_layout.addWidget(button)
                 # button.setStyleSheet("""
                 # QPushButton {
                 #         padding: 10px;
@@ -78,62 +80,57 @@ class SideBar(QFrame):
 class LiveMode(QWidget):
         def __init__(self) -> None:
                 super().__init__()
-                main_layout = QHBoxLayout()
-                self.setLayout(main_layout)
-                main_layout.setSpacing(0)
-                main_layout.setContentsMargins(0,0,0,0)
+                self.main_layout = QHBoxLayout()
+                self.main_layout.setSpacing(0)
+                self.main_layout.setContentsMargins(0,0,0,0)
+                self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-                # sidebar contents
-                self.file_explorer_panel = QWidget()
+                # side panel
+                self.side_panel = SidePanel()
+                self.side_panel.setObjectName("Side Panel")
+
+                # side panel contents
+                self.file_explorer_panel = QWidget(self.side_panel)
+                self.file_explorer_panel.setObjectName("Explorer Side Panel")
+
                 self.file_explorer_panel_layout = QVBoxLayout()
                 self.file_explorer_panel.setLayout(self.file_explorer_panel_layout)
+
                 model = QFileSystemModel()
                 model.setRootPath("")
                 tree_view = QTreeView()
                 tree_view.setModel(model)
+
                 self.file_explorer_panel_layout.addWidget(tree_view)
 
-                self.detections_panel = QWidget()
+                self.detections_panel = QWidget(self.side_panel)
+                self.detections_panel.setObjectName("Detections Side Panel")
                 self.detections_panel_layout = QVBoxLayout()
                 self.detections_panel.setLayout(self.detections_panel_layout)
+
                 self.detections_panel_layout.addWidget(QLabel("Detections Content"))
 
-                self.layers_panel = QWidget()
+                self.layers_panel = QWidget(self.side_panel)
+                self.layers_panel.setObjectName("Tuning Side Panel")
                 self.layers_panel_layout = QVBoxLayout()
                 self.layers_panel.setLayout(self.layers_panel_layout)
                 self.layers_panel_layout.addWidget(QLabel("Viewport Layer Settings Content"))
 
-                # sidebar content stack
-                self.content_stack = QStackedWidget()
-                self.content_stack.setStyleSheet("background-color: #313131;")
-                self.content_stack.setMaximumWidth(200)
-                self.content_stack.addWidget(self.file_explorer_panel)
-                self.content_stack.addWidget(self.detections_panel)
-                self.content_stack.addWidget(self.layers_panel)
-                self.content_stack.setCurrentIndex(0)
+                SIDE_PANEL_CONTENTS = [('Explorer Side Panel', 'src/svg/explorer.svg'), ('Detections Side Panel', 'src/svg/detections.svg'), ('Tuning Side Panel', 'src/svg/tuning.svg')]
 
-                # sidebar
-                self.sidebar = SideBar()
-                self.sidebar.add_sidebar_button(self.show_file_explorer_panel, QIcon("gui_res/explorer.png"))
-                self.sidebar.add_sidebar_button(self.show_detections_panel, QIcon("gui_res/detections.png"))
-                self.sidebar.add_sidebar_button(self.show_layers, QIcon("gui_res/tuning.png"))
+
+                for item in SIDE_PANEL_CONTENTS:
+                        name, svg_path = item
+                        widget = self.side_panel.findChild(QWidget, name)
+                        self.side_panel.addTab(widget, svg_path)
 
                 # viewport
                 self.viewport = Viewport()
-                main_layout.addWidget(self.sidebar)
-                main_layout.addWidget(self.content_stack)
-                main_layout.addWidget(self.viewport)
+                self.main_layout.addWidget(self.side_panel)
+                self.main_layout.addWidget(self.viewport)
+                self.setLayout(self.main_layout)
                 
 
-        def show_file_explorer_panel(self):
-                self.content_stack.setCurrentWidget(self.file_explorer_panel)
-        
-        def show_detections_panel(self):
-                self.content_stack.setCurrentWidget(self.detections_panel)
-
-        def show_layers(self):
-                self.content_stack.setCurrentWidget(self.layers_panel)
-        
 
 
 class GUI(object):
@@ -155,12 +152,11 @@ class GUI(object):
 
                 # Create header
                 self.header = Header()
-
                 # Create contents widget
                 self.content = QStackedWidget()
 
                 self.page_live = LiveMode()
-
+                
                 # placeholder_layout_live = QVBoxLayout()
                 # self.page_live.setLayout(placeholder_layout_live)
                 # placeholder_label_page_live = QLabel("PAGE 1")

@@ -1,4 +1,4 @@
-# Python 3.12.2
+# # Python 3.12.2
 
 import os
 import time
@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
         app = QApplication()
+        app.setWindowIcon(QIcon("src/logo_1.png"))
         view = MainWindow()
         view.show()
-        app.setWindowIcon(QIcon("gui_res/logo_1.png"))
         sys.exit(app.exec())
