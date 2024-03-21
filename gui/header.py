@@ -3,23 +3,25 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLayout, QLabel, QPushButton,
 from PySide6.QtGui import QFont, QColor, QIcon, QImage, QPixmap
 from PySide6.QtSvgWidgets import QSvgWidget
 
-class Button(QPushButton):
+class HeaderButton(QPushButton):
         def __init__(self, parent, icon) -> None:
                 super().__init__(parent)
                 self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-                self.setStyleSheet("color: rgb(255, 255, 255); font-size: 24px; padding: 0 24px; border: 0px solid;")
+                # self.setStyleSheet("color: rgb(255, 255, 255); font-size: 24px; padding: 13 24px; border: 0px solid;")
                 self.button_icon = QSvgWidget(icon)
                 main_layout = QVBoxLayout()
+                main_layout.setContentsMargins(15,13,15,13)
                 main_layout.setSpacing(0)
                 main_layout.setContentsMargins(0, 0, 0, 0)
                 self.setLayout(main_layout)
 
                 main_layout.addWidget(self.button_icon)
 
-class Header(QFrame):
+class Header(QWidget):
         def __init__(self) -> None:
                 super().__init__()
-                self.setStyleSheet("background-color: #444;")  # Set header background color
+                self.setObjectName("Header")
+                self.setStyleSheet("""background-color: #444;""")  # Set header background color
                 self.setFixedHeight(100)  # Set header height
                 
                 # Set Layout for the header
@@ -28,11 +30,11 @@ class Header(QFrame):
                 main_layout.setContentsMargins(0, 0, 0, 0)  # Set margins to zero
                 main_layout.setSpacing(0)
                 
-                window_control_frame = QFrame()
+                window_control_frame = QWidget()
                 window_control_layout = QHBoxLayout()
                 window_control_frame.setLayout(window_control_layout)
                 window_control_frame.setFixedHeight(30)
-                window_control_frame.setStyleSheet("background-color: 'black'")
+                # window_control_frame.setStyleSheet("background-color: 'black'")
                 
                 # window_control_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
                 window_control_layout.setContentsMargins(0, 0, 0, 0)  # Set margins to zero
@@ -40,37 +42,22 @@ class Header(QFrame):
                 
                 header_layout = QHBoxLayout()
                 header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-                header_layout.setContentsMargins(0, 0, 0, 0)  # Set margins to zero
-                header_layout.setSpacing(0)
+                # header_layout.setContentsMargins(19, 15, 15, 15)  # Set margins to zero
+                header_layout.setSpacing(10)
                 
                 main_layout.addWidget(window_control_frame)
                 main_layout.addLayout(header_layout)
 
-                """
-                # Add title label to the header
-                self.title_label = QLabel()
-                self.title_label_layout = QVBoxLayout()
-                self.title_label_layout.setContentsMargins(24,13,24,13)
-                self.title_label.setLayout(self.title_label_layout)
-
-                self.logo = QSvgWidget("./gui_res/logo.svg")
-                self.logo.setFixedSize(150, 33)
-
-                self.title_label_layout.addWidget(self.logo)
-                self.title_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-                self.title_label.setFixedWidth(198)
-                main_layout.addWidget(self.title_label)
-                """
                 self.logo = QSvgWidget("src/svg/logo.svg")
                 self.logo.setFixedSize(53, 59)
                 header_layout.addWidget(self.logo)
 
                 # Add button for Live Mode
-                self.live_button = Button(self, 'src/svg/live_60.svg')
+                self.live_button = HeaderButton(self, 'src/svg/live_60.svg')
                 header_layout.addWidget(self.live_button)
 
                 # Add button for Playback Mode
-                self.playback_button = Button(self, 'src/svg/playback_60.svg')
+                self.playback_button = HeaderButton(self, 'src/svg/playback_60.svg')
                 header_layout.addWidget(self.playback_button)
 
 
