@@ -15,6 +15,7 @@ class Controller(QObject):
         # Controller Signals
         status_request = Signal()
         start_cycle = Signal(tuple)
+        update_parameter = Signal(tuple)
 
         # Controller Members
         log_count = 0
@@ -144,6 +145,11 @@ class Controller(QObject):
                 if purpose == Purpose.STATUS_UPDATE:
                         object_stats = self.global_stats[sender]
                         object_stats.append(data)
+                if sender == "VIEW" and purpose == Purpose.UPDATE_PARAMETERS:
+                        self.update_parameter.emit((self.frame_grabber.objectName(), Purpose.UPDATE_PARAMETERS, data))
+                        self.start_threads()
+                # elif sender == "VIEW" and purpose == "STOP":
+                        # self.stop_threads()
         @Slot()
         def cycle_timeout_handler(self):
                 self.status_request.emit()

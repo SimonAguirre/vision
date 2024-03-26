@@ -47,6 +47,8 @@ class DataQueue(QObject):
                 self.counter += 1
                 if purpose == Purpose.RESTART_CYCLE:
                         self.give_data_to_worker.emit((sender, purpose, "None"))
+                if sender == "Frame Annotator":
+                        self.give_data_to_worker.emit((self.objectName(), Purpose.UPDATE_DISPLAY, item))
 
         @Slot()
         def status_request_handler(self):

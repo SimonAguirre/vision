@@ -1,0 +1,34 @@
+<RCC>
+  <qresource prefix="buttons">
+    <file>close.png</file>
+    <file>dock.png</file>
+    <file>minimize.png</file>
+    <file>svg/charts.svg</file>
+    <file>svg/charts_60.svg</file>
+    <file>svg/charts_white.svg</file>
+    <file>svg/detections.svg</file>
+    <file>svg/detections_60.svg</file>
+    <file>svg/detections_white.svg</file>
+    <file>svg/explorer.svg</file>
+    <file>svg/explorer_60.svg</file>
+    <file>svg/explorer_white.svg</file>
+    <file>svg/live.svg</file>
+    <file>svg/live_60.svg</file>
+    <file>svg/live_white.svg</file>
+    <file>svg/model.svg</file>
+    <file>svg/model_60.svg</file>
+    <file>svg/model_white.svg</file>
+    <file>svg/playback.svg</file>
+    <file>svg/playback_60.svg</file>
+    <file>svg/playback_white.svg</file>
+    <file>svg/settings.svg</file>
+    <file>svg/settings_60.svg</file>
+    <file>svg/settings_white.svg</file>
+    <file>svg/tuning.svg</file>
+    <file>svg/tuning_60.svg</file>
+    <file>svg/tuning_white.svg</file>
+  </qresource>
+  <qresource prefix="logo">
+    <file>svg/logo.svg</file>
+  </qresource>
+</RCC>

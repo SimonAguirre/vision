@@ -8,3 +8,4 @@ class Purpose(enum.Enum):
         STATUS_UPDATE = 'status update'
         START_ALL = 'start all components of pipeline'
         RESTART_CYCLE = 'restart worker cycle'
+        UPDATE_DISPLAY = 'show image to viewport'
